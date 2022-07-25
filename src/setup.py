@@ -143,6 +143,7 @@ setup(
             "flake8-bugbear",
             "freezegun",
             "isort",
+            "jsonschema",
             "lxml",
             "pytest",
             "pytest-cov",
