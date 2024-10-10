@@ -244,6 +244,12 @@ class Submission(GenerateCode, PretalxModel):
     deleted_objects = ScopedManager(
         event="event", _manager_class=DeletedSubmissionManager
     )
+    ticket_id = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name=_("Ticket ID"),
+        help_text=_("The numeric ID of the submission's associated ticket in RT."),
+    )
     all_objects = ScopedManager(event="event", _manager_class=AllSubmissionManager)
 
     class urls(EventUrls):
@@ -464,6 +470,27 @@ class Submission(GenerateCode, PretalxModel):
     update_talk_slots.alters_data = True
 
     def send_initial_mails(self, person):
+
+        """ 38C3 hack in lack of a plugin """
+        import rt.rest2
+        import httpx
+
+        queue = '38c3-content'
+        if self.event.slug == '38c3':
+            queue = '38c3-content'
+        elif self.event.slug == '38c3-community-stages':
+            queue = '38c3-community'
+        elif self.event.slug == '38c3-lounge':
+            queue = '38c3-booking'
+        elif self.event.slug == '38c3-lightningtalks':
+            queue = '38c3-lightningtalks'
+
+        new_ticket = {'Requestor': [person.email], 'Status': "resolved", 'Owner': "Nobody", }
+        c = rt.rest2.Rt(url="https://rt.cccv.de/REST/2.0/", http_auth=httpx.BasicAuth("...", "..."))
+        self.ticket_id = c.create_ticket(queue, subject=str(_("New proposal")) + f": {self.title}", content="Ticket automatically created by 38C3 pretalx", **new_ticket)
+        self.save()
+        """ 38C3 hack in lack of a plugin ends """
+
         self.event.ack_template.to_mail(
             user=person,
             event=self.event,
