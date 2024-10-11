@@ -92,8 +92,22 @@ class AdminUserList(PermissionRequired, ListView):
 
     def get_queryset(self):
         search = self.request.GET.get("q", "").strip()
+        if search == "*":
+            return (
+                User.objects.all()
+                .prefetch_related(
+                    "teams",
+                    "teams__organiser",
+                    "teams__organiser__events",
+                    "teams__limit_events",
+                )
+                .annotate(
+                    submission_count=Count("submissions", distinct=True),
+                )
+            )
         if not search or len(search) < 3:
             return User.objects.none()
+
         return (
             User.objects.filter(Q(name__icontains=search) | Q(email__icontains=search))
             .prefetch_related(
