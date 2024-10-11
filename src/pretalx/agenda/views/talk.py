@@ -137,7 +137,7 @@ class TalkReviewView(TalkView):
     template_name = "agenda/talk.html"
 
     def has_permission(self):
-        return True
+        return False
 
     def get_object(self):
         return get_object_or_404(
