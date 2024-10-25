@@ -3,6 +3,7 @@
 Release Notes
 =============
 
+- :feature:`orga` Added references to submissions to outgoing mails. This shall facilitate the integration with issue tracking systems.
 - :release:`2024.3.1 <2024-10-27>`
 - :bug:`schedule` The schedule would work only intermittently when used with a custom domain.
 - :bug:`cfp` The resource upload form always mentioned a hard-coded file upload limit (but would in reality allow files up to the size of the real file upload limit).
