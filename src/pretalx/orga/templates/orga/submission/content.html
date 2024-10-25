@@ -74,6 +74,10 @@
             {{ form.is_featured.as_field_group }}
             {{ form.duration.as_field_group }}
             {% if form.slot_count %}{{ form.slot_count.as_field_group }}{% endif %}
+            {% if form.ticket_id %}
+            <a class="float-right" href="https://rt.cccv.de/Ticket/Display.html?id={{form.ticket_id.value}}">rt link</a>
+            {% bootstrap_field form.ticket_id layout='event' %}
+            {% endif %}
             {% if form.image %}{{ form.image.as_field_group }}{% endif %}
             {% if action != "create" %}
                 {% include "cfp/includes/submission_resources_form.html" %}
