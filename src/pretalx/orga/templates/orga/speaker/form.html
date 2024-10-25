@@ -83,8 +83,11 @@
                 </button>
             </span>
         </div>
-    </form>
 
+        <h3>{% translate 'Tickets' %}</h3>
+        {% include 'common/ticket_log.html' %}
+
+    </form>
 
     <h3>{% translate 'Emails' %}</h3>
     {% if mails %}

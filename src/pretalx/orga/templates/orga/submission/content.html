@@ -148,6 +148,15 @@
             {% bootstrap_form questions_form layout='event' %}
         {% endif %}
 
+        {% if submission.code == 'ZZ3FDK' %}
+            <div><legend>{% translate "Tickets" %}</legend></div>
+            {% if tickets or submission.code == 'ZZ3FDK' %}
+                {% include 'common/ticket_log.html' %}
+            {% else %}
+                {% translate "No tickets were associated to this speaker yet." %}
+            {% endif %}
+        {% endif %}
+
         {% if can_send_mails or not form.read_only %}
             <div class="submit-group panel">
                 <span></span>
