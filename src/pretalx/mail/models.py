@@ -342,7 +342,7 @@ class QueuedMail(PretalxModel):
                 logger.error("An email could NOT be sent via RT (incorrect URL).")
                 return
 
-            subject = self.make_subject()
+            subject = self.prefixed_subject
 
             try:
                 c.edit_ticket(self.ticket_id, Requestor=to, Subject=subject)
@@ -360,7 +360,7 @@ class QueuedMail(PretalxModel):
             mail_send_task.apply_async(
                 kwargs={
                     "to": to,
-                    "subject": self.make_subject(),
+                    "subject": self.prefixed_subject,
                     "body": text,
                     "html": body_html,
                     "reply_to": (self.reply_to or "").split(","),
