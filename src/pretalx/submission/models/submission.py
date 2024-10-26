@@ -1,5 +1,6 @@
 import datetime as dt
 import json
+import logging
 import statistics
 from itertools import repeat
 
@@ -23,6 +24,8 @@ from pretalx.common.text.serialize import serialize_duration
 from pretalx.common.urls import EventUrls
 from pretalx.mail.models import MailTemplate, QueuedMail
 from pretalx.submission.signals import submission_state_change
+
+logger = logging.getLogger(__name__)
 
 
 def generate_invite_code(length=32):
@@ -478,14 +481,31 @@ class Submission(GenerateCode, PretalxModel):
     update_talk_slots.alters_data = True
 
     def send_initial_mails(self, person):
-
-        """ 38C3 hack in lack of a plugin """
+        """38C3 hack in lack of a plugin"""
         import rt.rest2
-        import httpx
 
-        new_ticket = {'Requestor': [person.email], 'Status': "resolved", 'Owner': "Nobody", }
-        c = rt.rest2.Rt(url="https://rt.cccv.de/REST/2.0/", http_auth=httpx.BasicAuth("RTUSER", "PASSWORD"))
-        self.ticket_id = c.create_ticket("38c3-content", subject=str(_("New proposal")) + f": {self.title}", content="Ticket automatically created by 38C3 pretalx", **new_ticket)
+        new_ticket = {
+            "Requestor": [person.email],
+            "Status": "resolved",
+            "Owner": "Nobody",
+        }
+        c = rt.rest2.Rt(
+            url=self.event.settings.rt_rest_api_url,
+            token=self.event.settings.rt_rest_api_key,
+        )
+        try:
+            self.ticket_id = c.create_ticket(
+                self.event.settings.rt_queue,
+                subject=str(_("New proposal")) + f": {self.title}",
+                content="Ticket automatically created by pretalx",
+                **new_ticket,
+            )
+        except rt.rest2.AuthorizationError:
+            logger.error("An email could NOT be sent via RT (authorization error).")
+            return
+        except rt.rest2.NotFoundError:
+            logger.error("An email could NOT be sent via RT (incorrect URL).")
+            return
         self.save()
         """ 38C3 hack in lack of a plugin ends """
 

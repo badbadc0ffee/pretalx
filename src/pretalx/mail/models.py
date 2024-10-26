@@ -1,3 +1,4 @@
+import logging
 from copy import deepcopy
 
 from django.conf import settings
@@ -14,6 +15,8 @@ from pretalx.common.models.mixins import PretalxModel
 from pretalx.common.urls import EventUrls
 from pretalx.mail.context import get_mail_context
 from pretalx.mail.signals import queuedmail_post_send
+
+logger = logging.getLogger(__name__)
 
 
 def get_prefixed_subject(event, subject):
@@ -163,7 +166,7 @@ class MailTemplate(PretalxModel):
                 text=text,
                 locale=locale,
                 attachments=attachments,
-                ticket_id=ticket_id
+                ticket_id=ticket_id,
             )
             if commit:
                 mail.save()
@@ -323,19 +326,34 @@ class QueuedMail(PretalxModel):
 
         if self.ticket_id:
 
-            """ 38C3 hack in lack of a plugin """
+            """38C3 hack in lack of a plugin"""
             import rt.rest2
-            import httpx
 
-            c = rt.rest2.Rt(url="https://rt.cccv.de/REST/2.0/", http_auth=httpx.BasicAuth("RTUSER", "PASSWORD"))
-            ticket = c.get_ticket(self.ticket_id)
+            c = rt.rest2.Rt(
+                url=self.event.settings.rt_rest_api_url,
+                token=self.event.settings.rt_rest_api_key,
+            )
+            try:
+                ticket = c.get_ticket(self.ticket_id)
+            except rt.rest2.AuthorizationError:
+                logger.error("An email could NOT be sent via RT (authorization error).")
+                return
+            except rt.rest2.NotFoundError:
+                logger.error("An email could NOT be sent via RT (incorrect URL).")
+                return
+
             subject = self.make_subject()
 
             try:
                 c.edit_ticket(self.ticket_id, Requestor=to, Subject=subject)
-                c.reply(self.ticket_id, content=text, content_type='text/plain')
+                c.reply(self.ticket_id, content=text, content_type="text/plain")
             finally:
-                c.edit_ticket(self.ticket_id, Requestor=ticket["Requestor"], Subject=ticket["Subject"], Status=ticket["Status"])
+                c.edit_ticket(
+                    self.ticket_id,
+                    Requestor=ticket["Requestor"],
+                    Subject=ticket["Subject"],
+                    Status=ticket["Status"],
+                )
             """ 38C3 hack in lack of a plugin ends """
 
         else:
