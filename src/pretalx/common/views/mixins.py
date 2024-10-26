@@ -322,7 +322,7 @@ class PaginationMixin:
     # TODO: possible make this into a PretalxListView, to make things easier for
     # plugin developers
 
-    DEFAULT_PAGINATION = 50
+    DEFAULT_PAGINATION = 100
 
     def get_paginate_by(self, queryset):
         skey = "stored_page_size_" + self.request.resolver_match.url_name
@@ -333,7 +333,7 @@ class PaginationMixin:
         )
         if self.request.GET.get("page_size"):
             try:
-                max_page_size = getattr(self, "max_page_size", 250)
+                max_page_size = getattr(self, "max_page_size", 2500)
                 size = min(max_page_size, int(self.request.GET.get("page_size")))
                 self.request.session[skey] = size
                 return size
@@ -344,7 +344,7 @@ class PaginationMixin:
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["page_size"] = self.get_paginate_by(None)
-        ctx["pagination_sizes"] = [50, 100, 250]
+        ctx["pagination_sizes"] = [50, 100, 250, 500, 1000, 2500]
         return ctx
 
 
