@@ -73,9 +73,9 @@ def mail_send_task(
         [] if not reply_to or (len(reply_to) == 1 and reply_to[0] == "") else reply_to
     )
     reply_to = reply_to.split(",") if isinstance(reply_to, str) else reply_to
-    headers=headers or {}
+    headers = headers or {}
     if event:
-        headers["X-Pretalx-Event"]=event
+        headers["X-Pretalx-Event"] = event
 
         event = Event.objects.get(pk=event)
         backend = event.get_mail_backend()

@@ -156,7 +156,9 @@ class MailTemplate(PretalxModel):
             if "submission" in context_kwargs:
                 headers["X-Pretalx-Submission"] = context_kwargs["submission"].code
                 if context_kwargs["submission"].ticket_id:
-                    headers["X-Pretalx-RT-Ticket"] = context_kwargs["submission"].ticket_id
+                    headers["X-Pretalx-RT-Ticket"] = context_kwargs[
+                        "submission"
+                    ].ticket_id
             if "user" in context_kwargs:
                 headers["X-Pretalx-User"] = context_kwargs["user"].code
 
@@ -329,54 +331,21 @@ class QueuedMail(PretalxModel):
         if self.id:
             to += [user.email for user in self.to_users.all()]
 
-        if self.ticket_id:
-
-            """38C3 hack in lack of a plugin"""
-            import rt.rest2
-
-            c = rt.rest2.Rt(
-                url=self.event.settings.rt_rest_api_url,
-                token=self.event.settings.rt_rest_api_key,
-            )
-            try:
-                ticket = c.get_ticket(self.ticket_id)
-            except rt.rest2.AuthorizationError:
-                logger.error("An email could NOT be sent via RT (authorization error).")
-                return
-            except rt.rest2.NotFoundError:
-                logger.error("An email could NOT be sent via RT (incorrect URL).")
-                return
-
-            subject = self.prefixed_subject
-
-            try:
-                c.edit_ticket(self.ticket_id, Requestor=to, Subject=subject)
-                c.reply(self.ticket_id, content=text, content_type="text/plain")
-            finally:
-                c.edit_ticket(
-                    self.ticket_id,
-                    Requestor=ticket["Requestor"],
-                    Subject=ticket["Subject"],
-                    Status=ticket["Status"],
-                )
-            """ 38C3 hack in lack of a plugin ends """
-
-        else:
-            mail_send_task.apply_async(
-                kwargs={
-                    "to": to,
-                    "subject": self.prefixed_subject,
-                    "body": text,
-                    "html": body_html,
-                    "reply_to": (self.reply_to or "").split(","),
-                    "event": self.event.pk if has_event else None,
-                    "cc": (self.cc or "").split(","),
-                    "bcc": (self.bcc or "").split(","),
-                    "attachments": self.attachments,
-                    "headers": self.headers,
-                },
-                ignore_result=True,
-            )
+        mail_send_task.apply_async(
+            kwargs={
+                "to": to,
+                "subject": self.prefixed_subject,
+                "body": text,
+                "html": body_html,
+                "reply_to": (self.reply_to or "").split(","),
+                "event": self.event.pk if has_event else None,
+                "cc": (self.cc or "").split(","),
+                "bcc": (self.bcc or "").split(","),
+                "attachments": self.attachments,
+                "headers": self.headers,
+            },
+            ignore_result=True,
+        )
 
         self.sent = now()
         if self.pk:
