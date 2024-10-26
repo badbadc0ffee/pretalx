@@ -481,34 +481,6 @@ class Submission(GenerateCode, PretalxModel):
     update_talk_slots.alters_data = True
 
     def send_initial_mails(self, person):
-        """38C3 hack in lack of a plugin"""
-        import rt.rest2
-
-        new_ticket = {
-            "Requestor": [person.email],
-            "Status": "resolved",
-            "Owner": "Nobody",
-        }
-        c = rt.rest2.Rt(
-            url=self.event.settings.rt_rest_api_url,
-            token=self.event.settings.rt_rest_api_key,
-        )
-        try:
-            self.ticket_id = c.create_ticket(
-                self.event.settings.rt_queue,
-                subject=str(_("New proposal")) + f": {self.title}",
-                content="Ticket automatically created by pretalx",
-                **new_ticket,
-            )
-        except rt.rest2.AuthorizationError:
-            logger.error("An email could NOT be sent via RT (authorization error).")
-            return
-        except rt.rest2.NotFoundError:
-            logger.error("An email could NOT be sent via RT (incorrect URL).")
-            return
-        self.save()
-        """ 38C3 hack in lack of a plugin ends """
-
         self.event.ack_template.to_mail(
             user=person,
             event=self.event,
