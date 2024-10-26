@@ -1,6 +1,5 @@
 import datetime as dt
 import json
-import logging
 import statistics
 from itertools import repeat
 
@@ -24,8 +23,6 @@ from pretalx.common.text.serialize import serialize_duration
 from pretalx.common.urls import EventUrls
 from pretalx.mail.models import MailTemplate, QueuedMail
 from pretalx.submission.signals import submission_state_change
-
-logger = logging.getLogger(__name__)
 
 
 def generate_invite_code(length=32):

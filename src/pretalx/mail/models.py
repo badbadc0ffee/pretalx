@@ -1,4 +1,3 @@
-import logging
 from copy import deepcopy
 
 from django.conf import settings
@@ -15,8 +14,6 @@ from pretalx.common.models.mixins import PretalxModel
 from pretalx.common.urls import EventUrls
 from pretalx.mail.context import get_mail_context
 from pretalx.mail.signals import queuedmail_post_send
-
-logger = logging.getLogger(__name__)
 
 
 def get_prefixed_subject(event, subject):
@@ -330,7 +327,6 @@ class QueuedMail(PretalxModel):
         to = self.to.split(",") if self.to else []
         if self.id:
             to += [user.email for user in self.to_users.all()]
-
         mail_send_task.apply_async(
             kwargs={
                 "to": to,
