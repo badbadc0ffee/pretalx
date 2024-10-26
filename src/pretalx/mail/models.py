@@ -152,9 +152,13 @@ class MailTemplate(PretalxModel):
             if len(subject) > 200:
                 subject = subject[:198] + "…"
 
-            ticket_id = None
+            headers = {}
             if "submission" in context_kwargs:
-                ticket_id = context_kwargs["submission"].ticket_id
+                headers["X-Pretalx-Submission"] = context_kwargs["submission"].code
+                if context_kwargs["submission"].ticket_id:
+                    headers["X-Pretalx-RT-Ticket"] = context_kwargs["submission"].ticket_id
+            if "user" in context_kwargs:
+                headers["X-Pretalx-User"] = context_kwargs["user"].code
 
             mail = QueuedMail(
                 event=event or self.event,
@@ -166,7 +170,7 @@ class MailTemplate(PretalxModel):
                 text=text,
                 locale=locale,
                 attachments=attachments,
-                ticket_id=ticket_id,
+                headers=headers,
             )
             if commit:
                 mail.save()
@@ -245,6 +249,7 @@ class QueuedMail(PretalxModel):
     sent = models.DateTimeField(null=True, blank=True, verbose_name=_("Sent at"))
     locale = models.CharField(max_length=32, null=True, blank=True)
     attachments = models.JSONField(default=None, null=True, blank=True)
+    headers = models.JSONField(default=None, null=True, blank=True)
     ticket_id = models.PositiveIntegerField(
         null=True,
         blank=True,
@@ -368,6 +373,7 @@ class QueuedMail(PretalxModel):
                     "cc": (self.cc or "").split(","),
                     "bcc": (self.bcc or "").split(","),
                     "attachments": self.attachments,
+                    "headers": self.headers,
                 },
                 ignore_result=True,
             )
