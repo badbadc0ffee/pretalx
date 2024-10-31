@@ -3,6 +3,7 @@
 Release Notes
 =============
 
+- :feature:`orga:email,1596` Added the ``queuedmail_pre_send`` signal. This can be used to integrate with issue tracking systems. Receivers can set the ``sent`` timestamp on the queued mail object to skip sending mail via the regular backend.
 - :feature:`orga` Added references to submissions to outgoing mails. This shall facilitate the integration with issue tracking systems.
 - :release:`2024.3.1 <2024-10-27>`
 - :bug:`schedule` The schedule would work only intermittently when used with a custom domain.
