@@ -141,6 +141,10 @@ class MailTemplate(PretalxModel):
             if len(subject) > 200:
                 subject = subject[:198] + "…"
 
+            ticket_id = None
+            if "submission" in context_kwargs:
+                ticket_id = context_kwargs["submission"].ticket_id
+
             mail = QueuedMail(
                 event=event or self.event,
                 template=self,
@@ -151,6 +155,7 @@ class MailTemplate(PretalxModel):
                 text=text,
                 locale=locale,
                 attachments=attachments,
+                ticket_id=ticket_id
             )
             if commit:
                 mail.save()
@@ -229,6 +234,12 @@ class QueuedMail(PretalxModel):
     sent = models.DateTimeField(null=True, blank=True, verbose_name=_("Sent at"))
     locale = models.CharField(max_length=32, null=True, blank=True)
     attachments = models.JSONField(default=None, null=True, blank=True)
+    ticket_id = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name=_("Ticket ID"),
+        help_text=_("The numeric ID of the submission's associated ticket in RT."),
+    )
 
     class urls(EventUrls):
         base = edit = "{self.event.orga_urls.mail}{self.pk}/"
@@ -301,20 +312,39 @@ class QueuedMail(PretalxModel):
         to = self.to.split(",") if self.to else []
         if self.id:
             to += [user.email for user in self.to_users.all()]
-        mail_send_task.apply_async(
-            kwargs={
-                "to": to,
-                "subject": self.make_subject(),
-                "body": text,
-                "html": body_html,
-                "reply_to": (self.reply_to or "").split(","),
-                "event": self.event.pk if has_event else None,
-                "cc": (self.cc or "").split(","),
-                "bcc": (self.bcc or "").split(","),
-                "attachments": self.attachments,
-            },
-            ignore_result=True,
-        )
+
+        if self.ticket_id:
+
+            """ 38C3 hack in lack of a plugin """
+            import rt.rest2
+            import httpx
+
+            c = rt.rest2.Rt(url="https://rt.cccv.de/REST/2.0/", http_auth=httpx.BasicAuth("RTUSER", "PASSWORD"))
+            ticket = c.get_ticket(self.ticket_id)
+            subject = self.make_subject()
+
+            try:
+                c.edit_ticket(self.ticket_id, Requestor=to, Subject=subject)
+                c.reply(self.ticket_id, content=text, content_type='text/plain')
+            finally:
+                c.edit_ticket(self.ticket_id, Requestor=ticket["Requestor"], Subject=ticket["Subject"], Status=ticket["Status"])
+            """ 38C3 hack in lack of a plugin ends """
+
+        else:
+            mail_send_task.apply_async(
+                kwargs={
+                    "to": to,
+                    "subject": self.make_subject(),
+                    "body": text,
+                    "html": body_html,
+                    "reply_to": (self.reply_to or "").split(","),
+                    "event": self.event.pk if has_event else None,
+                    "cc": (self.cc or "").split(","),
+                    "bcc": (self.bcc or "").split(","),
+                    "attachments": self.attachments,
+                },
+                ignore_result=True,
+            )
 
         self.sent = now()
         if self.pk:
