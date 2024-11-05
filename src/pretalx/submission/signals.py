@@ -13,3 +13,7 @@ and ``user`` (which may be ``None``).
 When the submission is created or submitted from a draft state, ``old_state`` will be
 ``None``.
 """
+
+submission_details = EventPluginSignal()
+
+submission_link = EventPluginSignal()

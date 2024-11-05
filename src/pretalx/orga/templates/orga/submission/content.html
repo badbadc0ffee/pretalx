@@ -3,6 +3,7 @@
 {% load compress %}
 {% load filesize %}
 {% load formset_tags %}
+{% load html_signal %}
 {% load i18n %}
 {% load static %}
 {% load rules %}
@@ -82,6 +83,7 @@
                 <div><legend>{% translate "Questions" %}</legend></div>
                 {{ questions_form }}
             {% endif %}
+            {% html_signal "pretalx.submission.signals.submission_details" sender=request.event request=request submission=submission %}
 
             {% if not form.read_only %}
                 <div class="submit-group panel">
