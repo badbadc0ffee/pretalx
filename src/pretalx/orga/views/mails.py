@@ -23,6 +23,7 @@ from pretalx.common.views.mixins import (
     Sortable,
 )
 from pretalx.mail.models import MailTemplate, QueuedMail, get_prefixed_subject
+from pretalx.mail.signals import mail_forms
 from pretalx.orga.forms.mails import (
     DraftRemindersForm,
     MailDetailForm,
@@ -264,6 +265,12 @@ class MailDetail(PermissionRequired, ActionFromUrl, CreateOrUpdateView):
     def form_valid(self, form):
         form.instance.event = self.request.event
         result = super().form_valid(form)
+        for plugin_form in self.plugin_forms:
+            if not plugin_form.is_valid():
+                if plugin_form.errors:
+                    messages.error(self.request, self.plugin_forms.errors[0])
+            else:
+                plugin_form.save()
         if form.has_changed():
             action = "pretalx.mail." + ("update" if self.object else "create")
             form.instance.log_action(action, person=self.request.user, orga=True)
@@ -279,6 +286,22 @@ class MailDetail(PermissionRequired, ActionFromUrl, CreateOrUpdateView):
                 ),
             )
         return result
+
+    @context
+    @cached_property
+    def plugin_forms(self):
+        mail = self.get_object()
+        forms = []
+        for __, resp in mail_forms.send(
+            sender=self.request.event, request=self.request, mail=mail
+        ):
+            if not resp:
+                continue
+            if isinstance(resp, (list, tuple)):
+                forms.extend(resp)
+            else:
+                forms.append(resp)
+        return forms
 
 
 class MailCopy(PermissionRequired, View):

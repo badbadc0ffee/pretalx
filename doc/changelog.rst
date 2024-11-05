@@ -3,6 +3,8 @@
 Release Notes
 =============
 
+- :feature:`dev` Plugins can now inject additional form elements in the organisers area with the ``pretalx.person.signals.speaker_forms``, ``pretalx.mail.signals.mail_forms`` and ``pretalx.submission.signals.submission_forms`` signals.
+- :feature:`dev` Plugins can now inject HTML content into pages in the organisers area with the ``pretalx.person.signals.speaker_form_html``, ``pretalx.mail.signals.mail_form_html``, ``pretalx.submission.signals.submission_form_html`` and ``pretalx.submission.signals.submission_form_link`` signals.
 - :feature:`orga:email,1596` Added the ``queuedmail_pre_send`` signal. This can be used to integrate with issue tracking systems. Receivers can set the ``sent`` timestamp on the queued mail object to skip sending mail via the regular backend.
 - :feature:`orga` Added references to submissions to outgoing mails. This shall facilitate the integration with issue tracking systems.
 - :release:`2024.3.1 <2024-10-27>`
