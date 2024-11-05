@@ -37,3 +37,7 @@ As with all event-plugin signals, the ``sender`` keyword argument will
 contain the event. Additionally, the ``mail`` keyword argument contains
 the ``QueuedMail`` instance itself.
 """
+
+mail_badge = EventPluginSignal()
+
+mail_details = EventPluginSignal()
