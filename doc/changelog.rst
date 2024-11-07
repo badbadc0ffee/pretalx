@@ -3,6 +3,7 @@
 Release Notes
 =============
 
+- :bug:`orga,1879` The template indicator (showing you which template an email was generated from) in the email lists were invisible.
 - :feature:`dev` Plugins can now inject additional form elements in the organisers area with the ``pretalx.person.signals.speaker_forms``, ``pretalx.mail.signals.mail_forms`` and ``pretalx.submission.signals.submission_forms`` signals.
 - :feature:`dev` Plugins can now inject HTML content into pages in the organisers area with the ``pretalx.person.signals.speaker_form_html``, ``pretalx.mail.signals.mail_form_html``, ``pretalx.submission.signals.submission_form_html`` and ``pretalx.submission.signals.submission_form_link`` signals.
 - :feature:`orga:email,1596` Added the ``queuedmail_pre_send`` signal. This can be used to integrate with issue tracking systems. Receivers can set the ``sent`` timestamp on the queued mail object to skip sending mail via the regular backend.
