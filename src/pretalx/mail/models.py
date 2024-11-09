@@ -84,7 +84,6 @@ class MailTemplate(PretalxModel):
         context_kwargs: dict = None,
         skip_queue: bool = False,
         commit: bool = True,
-        full_submission_content: bool = False,
         allow_empty_address: bool = False,
         submissions: list = None,
         attachments: list = False,
@@ -107,8 +106,6 @@ class MailTemplate(PretalxModel):
         :param skip_queue: Send directly. If combined with commit=False, this will
             remove any logging and traces.
         :param commit: Set ``False`` to return an unsaved object.
-        :param full_submission_content: Attach the complete submission with
-            all its fields to the email.
         """
         from pretalx.person.models import User
 
@@ -140,11 +137,6 @@ class MailTemplate(PretalxModel):
             try:
                 subject = str(self.subject).format(**context)
                 text = str(self.text).format(**context)
-                if full_submission_content and "submission" in context_kwargs:
-                    text += "\n\n\n***********\n\n" + str(
-                        _("Full proposal content:\n\n")
-                    )
-                    text += context_kwargs["submission"].get_content_for_mail()
             except KeyError as e:
                 raise SendMailException(
                     f"Experienced KeyError when rendering email text: {str(e)}"
