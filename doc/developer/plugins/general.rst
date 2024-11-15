@@ -15,6 +15,9 @@ Core
 .. automodule:: pretalx.common.signals
    :members: periodic_task, register_locales
 
+.. automodule:: pretalx.person.signals
+   :members: person_details
+   
 .. automodule:: pretalx.submission.signals
    :members: submission_state_change
 
