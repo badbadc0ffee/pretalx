@@ -103,7 +103,7 @@
                                 {% elif mail.template == request.event.question_template %}
                                     <span class="badge color-info">{% translate "Unanswered questions reminder" %}</span>
                                 {% endif %}
-                                {% html_signal "pretalx.mail.signals.mail_badge" sender=request.event request=request mail=mail %}
+                                {% html_signal "pretalx.mail.signals.html_after_mail_badge" sender=request.event request=request mail=mail %}
                             {% endif %}
                         </td>
                         <td class="text-right">

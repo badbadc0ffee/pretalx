@@ -16,16 +16,16 @@ Core
    :members: periodic_task, register_locales
 
 .. automodule:: pretalx.person.signals
-   :members: person_details
+   :members: html_below_person_form, html_below_person_form
    
 .. automodule:: pretalx.submission.signals
-   :members: submission_state_change
+   :members: html_above_submission_form, html_below_submission_form, html_below_submission_link, submission_state_change
 
 .. automodule:: pretalx.schedule.signals
    :members: schedule_release
 
 .. automodule:: pretalx.mail.signals
-   :members: register_mail_placeholders, queuedmail_post_send, queuedmail_pre_send
+   :members: html_after_mail_badge, html_below_mail_subject, register_mail_placeholders, queuedmail_post_send, queuedmail_pre_send
 
 Exporters
 ---------
@@ -52,4 +52,4 @@ Display
    :members: cfp_steps, footer_link, html_above_submission_list, html_above_profile_page, html_head
 
 .. automodule:: pretalx.agenda.signals
-   :members: register_recording_providers, html_above_session_pages, html_below_session_pages
+   :members: register_recording_providers, html_above_session_form, html_below_session_form
