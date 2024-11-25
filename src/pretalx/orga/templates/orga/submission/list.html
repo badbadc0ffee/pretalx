@@ -82,18 +82,13 @@
                             <a href="{% querystring sort="-submission_type__name" %}"><i class="fa fa-caret-up" title="{% translate "Sort (z-a)" %}"></i></a>
                         </th>
                     {% endif %}
-                    <th>
+                    <th style="min-width: 180px;">
                         {% translate "State" %}
                         <a href="{% querystring sort="state" %}"><i class="fa fa-caret-down" title="{% translate "Sort (a-z)" %}"></i></a>
                         <a href="{% querystring sort="-state" %}"><i class="fa fa-caret-up" title="{% translate "Sort (z-a)" %}"></i></a>
                     </th>
                     {% if can_change_submission %}
-                        <th>
-                            {% translate "Featured" %} <i class="fa fa-question-circle" data-toggle="tooltip" title="{% translate "Show this session on the list of featured sessions, once it was accepted" %}"></i>
-                            <a href="{% querystring sort="-is_featured" %}"><i class="fa fa-caret-down"></i></a>
-                            <a href="{% querystring sort="is_featured" %}"><i class="fa fa-caret-up"></i></a>
-                        </th>
-                        <th></th>
+                        <th style="min-width: 85px;"></th>
                     {% endif %}
                 </tr>
             </thead>
@@ -139,21 +134,6 @@
 
                         </td>
                         {% if can_change_submission %}
-                            <td class="submission_featured">
-                                <div class="mt-1 form-check" title="{% translate "Show this proposal in the list of featured sessions." %}">
-                                    <input
-                                        type="checkbox"
-                                        id="featured_{{ submission.code }}"
-                                        data-id="{{ submission.code }}"
-                                        class="submission_featured"
-                                        {% if submission.is_featured %}checked{% endif %}
-                                    >
-                                    <label for="featured_{{ submission.code }}"></label>
-                                </div>
-                                <i class="working fa fa-spinner fa-spin d-none"></i>
-                                <i class="done fa fa-check d-none text-success"></i>
-                                <i class="fail fa fa-times d-none"></i>
-                            </td>
                             <td class="text-right">
                                 <a href="{{ submission.orga_urls.edit }}" title="{{ phrases.base.edit }}" class="btn btn-sm btn-info">
                                     <i class="fa fa-edit"></i>
