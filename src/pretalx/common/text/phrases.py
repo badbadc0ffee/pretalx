@@ -86,6 +86,13 @@ class BasePhrases(Phrases, app="base"):
         _("This page has ceased to be."),
         _("Huh."),
     ]
+    teapot = _("I'm a teapot!")
+    teapot_long = [
+        _("I'm a little teapot.<br/>Short and stout,"),
+        _("Here is my handle<br/>Here is my spout"),
+        _("When I get all steamed up,<br/>Hear me shout,"),
+        _("Tip me over and pour me out!"),
+    ]
 
     enter_email = _("Email address")
     new_password = _("New password")
