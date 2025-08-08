@@ -44,11 +44,31 @@ def handle_418(request):
     return HttpResponseTeapot(template.render(context))
 
 
+def handle_425(request):
+    try:
+        template = loader.get_template("425.html")
+    except TemplateDoesNotExist:  # pragma: no cover
+        return HttpResponseServerError(
+            "Internal server error. Please contact the administrator for details.",
+            content_type="text/html",
+        )
+    context = {"phrases": phrases}
+    with suppress(
+        Exception
+    ):  # This should never fail, but can't be too cautious in error views
+        context["request_path"] = urllib.parse.quote(request.path)
+    class HttpResponseTooEarly(HttpResponseServerError):
+        status_code = 425
+    return HttpResponseTooEarly(template.render(context))
+
+
 def error_view(status_code):
     if status_code == 4031:
         return get_callable(settings.CSRF_FAILURE_VIEW)
     if status_code == 418:
         return handle_418
+    if status_code == 425:
+        return handle_425
     if status_code == 500:
         return handle_500
     exceptions = {
