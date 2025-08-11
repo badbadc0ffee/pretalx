@@ -1,3 +1,4 @@
+import contextlib
 import copy
 import datetime as dt
 import json
@@ -59,6 +60,40 @@ def submission_image_path(instance, filename):
     return path_with_hash(
         filename, base_path=f"{instance.event.slug}/submissions/{instance.code}/"
     )
+
+
+@contextlib.contextmanager
+def suppress_model_signals_for_submission_drafts():
+    from django.db.models.signals import m2m_changed, post_save, pre_save
+
+    _pre_save_send = pre_save.send
+    _post_save_send = post_save.send
+    _m2m_changed_send = m2m_changed.send
+
+    def _send_no_draft(send, sender, instance, **kwargs):
+        if (
+            isinstance(instance, Submission)
+            and instance.state == SubmissionStates.DRAFT
+        ):
+            return
+        send(sender, instance=instance, **kwargs)
+
+    pre_save.send = lambda sender, **kwargs: _send_no_draft(
+        _pre_save_send, sender, **kwargs
+    )
+    post_save.send = lambda sender, **kwargs: _send_no_draft(
+        _post_save_send, sender, **kwargs
+    )
+    m2m_changed.send = lambda sender, **kwargs: _send_no_draft(
+        _m2m_changed_send, sender, **kwargs
+    )
+
+    try:
+        yield
+    finally:
+        pre_save.send = _pre_save_send
+        post_save.send = _post_save_send
+        m2m_changed.send = _m2m_changed_send
 
 
 class SubmissionStates(Choices):

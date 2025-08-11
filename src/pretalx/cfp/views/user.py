@@ -34,6 +34,9 @@ from pretalx.person.rules import can_view_information
 from pretalx.schedule.forms import AvailabilitiesFormMixin
 from pretalx.submission.forms import InfoForm, QuestionsForm, ResourceForm
 from pretalx.submission.models import Resource, Submission, SubmissionStates
+from pretalx.submission.models.submission import (
+    suppress_model_signals_for_submission_drafts,
+)
 
 
 @method_decorator(gravatar_csp(), name="dispatch")
@@ -335,7 +338,8 @@ class SubmissionsEditView(LoggedInEventPageMixin, SubmissionViewMixin, UpdateVie
                 form.instance.pk = None
             elif form.has_changed():
                 form.instance.submission = obj
-                form.save()
+                with suppress_model_signals_for_submission_drafts():
+                    form.save()
                 change_data = {
                     key: form.cleaned_data.get(key) for key in form.changed_data
                 }
@@ -353,7 +357,8 @@ class SubmissionsEditView(LoggedInEventPageMixin, SubmissionViewMixin, UpdateVie
         ]
         for form in extra_forms:
             form.instance.submission = obj
-            form.save()
+            with suppress_model_signals_for_submission_drafts():
+                form.save()
             obj.log_action(
                 "pretalx.submission.resource.create",
                 person=self.request.user,
@@ -404,8 +409,9 @@ class SubmissionsEditView(LoggedInEventPageMixin, SubmissionViewMixin, UpdateVie
 
     def form_valid(self, form):
         if self.can_edit:
-            form.save()
-            self.qform.save()
+            with suppress_model_signals_for_submission_drafts():
+                form.save()
+                self.qform.save()
             result = self.save_formset(form.instance)
             if not result:
                 return self.get(self.request, *self.args, **self.kwargs)
@@ -506,7 +512,8 @@ class SubmissionInviteAcceptView(LoggedInEventPageMixin, DetailView):
             messages.error(self.request, _("You cannot accept this invitation."))
             return redirect(self.request.event.urls.user)
         submission = self.get_object()
-        submission.speakers.add(self.request.user)
+        with suppress_model_signals_for_submission_drafts():
+            submission.speakers.add(self.request.user)
         submission.log_action(
             "pretalx.submission.speakers.add", person=self.request.user
         )
