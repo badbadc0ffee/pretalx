@@ -35,6 +35,9 @@ from pretalx.submission.models import (
     SubmissionType,
     Track,
 )
+from pretalx.submission.models.submission import (
+    suppress_model_signals_for_submission_drafts,
+)
 
 
 def i18n_string(data, locales):
@@ -340,11 +343,12 @@ class InfoStep(GenericFlowStep, FormFlowStep):
         self.request = request
         form = self.get_form(from_storage=True)
         form.instance.event = self.event
-        if draft:
-            form.instance.state = SubmissionStates.DRAFT
-        form.save()
-        submission = form.instance
-        submission.speakers.add(request.user)
+        with suppress_model_signals_for_submission_drafts():
+            if draft:
+                form.instance.state = SubmissionStates.DRAFT
+                form.save()
+            submission = form.instance
+            submission.speakers.add(request.user)
         if draft:
             messages.success(
                 self.request,
@@ -374,10 +378,11 @@ class InfoStep(GenericFlowStep, FormFlowStep):
 
         access_code = getattr(request, "access_code", None)
         if access_code:
-            submission.access_code = access_code
-            submission.save()
-            access_code.redeemed += 1
-            access_code.save()
+            with suppress_model_signals_for_submission_drafts():
+                submission.access_code = access_code
+                submission.save()
+                access_code.redeemed += 1
+                access_code.save()
 
         request.submission = submission
 
@@ -449,7 +454,8 @@ class QuestionsStep(GenericFlowStep, FormFlowStep):
         form.speaker = request.user
         form.submission = request.submission
         form.is_valid()
-        form.save()
+        with suppress_model_signals_for_submission_drafts():
+            form.save()
 
     @property
     def label(self):
@@ -485,8 +491,9 @@ class UserStep(GenericFlowStep, FormFlowStep):
     def done(self, request, draft=False):
         if not getattr(request.user, "is_authenticated", False):
             form = self.get_form(from_storage=True)
-            form.is_valid()
-            uid = form.save()
+            with suppress_model_signals_for_submission_drafts():
+                form.is_valid()
+                uid = form.save()
             request.user = User.objects.filter(pk=uid).first()
         # This should never happen
         if not request.user or not request.user.is_active:  # pragma: no cover
@@ -548,9 +555,10 @@ class ProfileStep(GenericFlowStep, FormFlowStep):
 
     def done(self, request, draft=False):
         form = self.get_form(from_storage=True)
-        form.is_valid()
-        form.user = request.user
-        form.save()
+        with suppress_model_signals_for_submission_drafts():
+            form.is_valid()
+            form.user = request.user
+            form.save()
 
     @property
     def label(self):
