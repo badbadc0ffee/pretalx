@@ -3,9 +3,11 @@ from contextlib import suppress
 
 from django.conf import settings
 from django.core.exceptions import PermissionDenied, SuspiciousOperation
-from django.http import Http404, HttpResponseServerError
+from django.http import Http404, HttpResponse, HttpResponseServerError
 from django.template import TemplateDoesNotExist, loader
 from django.urls import get_callable
+
+from pretalx.common.text.phrases import phrases
 
 
 def handle_500(request):
@@ -24,9 +26,19 @@ def handle_500(request):
     return HttpResponseServerError(template.render(context))
 
 
+def handle_4xx(code, request):
+    template = loader.get_template(f"{code}.html")
+    context = {"phrases": phrases}
+    class Response(HttpResponse):
+        status_code = code
+    return Response(template.render(context))
+
+
 def error_view(status_code):
     if status_code == 4031:
         return get_callable(settings.CSRF_FAILURE_VIEW)
+    if status_code in [418, 425]:
+        return lambda request: handle_4xx(status_code, request)
     if status_code == 500:
         return handle_500
     exceptions = {
