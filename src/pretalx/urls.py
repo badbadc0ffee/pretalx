@@ -5,6 +5,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import include, path
 from django.utils.module_loading import import_string
+from django.views.generic.base import RedirectView
 
 from pretalx.common.views import error_view, redirect_view
 
@@ -23,6 +24,7 @@ urlpatterns = [
     path("404", error_view(404)),
     path("418", error_view(418)),
     path("425", error_view(425)),
+    path("39c3/", RedirectView.as_view(url="/425", permanent=False)),
     path("500", error_view(500)),
     path("orga/", include("pretalx.orga.urls", namespace="orga")),
     path("api/", include("pretalx.api.urls", namespace="api")),
