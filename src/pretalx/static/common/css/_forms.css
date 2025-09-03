@@ -179,7 +179,7 @@ input[type="file"] {
 }
 ::file-selector-button {
   margin-left: -6px;
-  color: var(--color-text);
+  color: var(--color-white);
   background-color: var(--color-secondary);
   pointer-events: none;
   border-width: 0;

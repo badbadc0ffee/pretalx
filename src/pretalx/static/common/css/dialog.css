@@ -29,7 +29,7 @@ dialog {
     outline: none;
   }
   &::backdrop {
-    background-color: rgb(0 0 0 / 0.2);
+    background-color: var(--color-grey-lighter);
     backdrop-filter: blur(2px);
   }
 
@@ -76,7 +76,7 @@ dialog#lightbox-dialog {
       top: -4px;
       right: 0;
       cursor: pointer;
-      color: rgb(0 0 0 / 0.7);
+      color: var(--color-grey-dark);
       font-size: 20px;
       border: none;
       background: transparent;

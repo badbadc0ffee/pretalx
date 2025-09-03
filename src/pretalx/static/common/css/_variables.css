@@ -78,7 +78,7 @@
 /* Dark theme (when user prefers dark color scheme) */
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-text: rgb(240, 240, 240);
+    --color-text: var(--color-grey-medium-light);
     --color-code: #ff8db3;
     --color-text-input: var(--color-grey-medium);
     --color-text-muted: var(--color-grey-medium);
@@ -141,7 +141,11 @@
       var(--color-warning),
       white 50%
     );
-    --color-danger: #e05c86;
+  --color-danger: color-mix(
+      in srgb,
+      #b23e65,
+      white 10%
+    );
     --color-danger-text: color-mix(in srgb, var(--color-danger), white 10%);
     --color-danger-text-dark: color-mix(
       in srgb,
