@@ -25,7 +25,7 @@ to show up in the schedule at the right time. You can learn more about managing 
 schedule-only items in the :ref:`Scheduling Guide <user-guide-schedule>`.
 
 Session Lifecycle
----------------
+-----------------
 
 Sessions go through several states during their lifecycle, and these states and
 their transitions are a key part of pretalx.
@@ -43,6 +43,11 @@ edit the session, depending on several factors: If the CfP is still open, a
 session can be edited, as the speakers otherwise could withdraw and re-submit
 their proposal. Once the CfP is closed, the setting of the active review phase
 applies, with the default being to prevent edits.
+
+Organisers can also completely disable speaker editing for all sessions (except drafts)
+using the "Allow speakers to edit their proposals" setting in the CfP configuration.
+When disabled, speakers cannot edit any of their proposals once submitted, regardless
+of CfP status or review phase settings. Draft proposals remain editable while the CfP is open.
 
 Accepted
 ^^^^^^^^
@@ -104,7 +109,7 @@ can’t be removed from the event unilaterally.
 .. _`user-guide-proposals-pending`:
 
 Pending States
-^^^^^^^^^^^^^
+^^^^^^^^^^^^^^
 
 When you change a proposal’s state, you can choose to set the new state as “pending”.
 If you do this, the proposal will keep its current state, while gaining a new pending
@@ -124,7 +129,7 @@ want to change, and then apply the pending states to only those sessions by clic
 button at the top of the list.
 
 Organisation Features
--------------------
+---------------------
 
 Sessions have several features that help organisers manage and categorise them:
 
@@ -163,11 +168,32 @@ Tags are internal labels that help organisers categorise and filter sessions.
 Only organisers and reviewers can see tags, they will not appear on the public schedule.
 
 You can use them for any organisational purpose that comes to mind, from state
-markers like “needs work”, organisational notes like “requires mentor”, or
-thematic labels like “beginner-friendly”.
+markers like "needs work", organisational notes like "requires mentor", or
+thematic labels like "beginner-friendly".
 
 We hope to make allow tags to show up in the public schedule in the future, but
 any tags existing prior to that point will remain internal.
+
+.. _`user-guide-featured-sessions`:
+
+Featured Sessions
+^^^^^^^^^^^^^^^^^
+
+Featured sessions are sessions that you want to highlight to your audience.
+They appear on a dedicated "Featured Sessions" page at ``/{event}/featured/``
+that can be made publicly accessible even before the full schedule is released.
+
+To mark a session as featured, check the "Featured" checkbox on the session detail page,
+or use the checkboxes on the session list page to mark multiple sessions as featured.
+You can control when the featured sessions page is visible to the public through the
+"Show featured sessions page" setting in your event's display settings. The options are:
+
+- Never: The featured sessions page is never visible to the public
+- Before schedule release: The page is visible until you release a public schedule
+- Always: The page is always publicly accessible
+
+This feature is particularly useful for highlighting keynotes, special presentations,
+or other important sessions you want to promote early in your event marketing.
 
 Speakers
 --------
@@ -182,7 +208,7 @@ The notification will be based on the email template „Add a speaker to a propo
 If the speaker does not have an account yet, their email will contain a link where they can set their account password.
 
 Interaction & Communication
--------------------------
+---------------------------
 
 There are two main ways to discuss sessions:
 

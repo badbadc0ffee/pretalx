@@ -1,3 +1,4 @@
+import html
 import json
 import random
 import uuid
@@ -13,6 +14,7 @@ from django.contrib.auth.models import (
     PermissionsMixin,
 )
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.utils.crypto import get_random_string
 from django.utils.functional import cached_property
@@ -21,12 +23,17 @@ from django.utils.translation import gettext_lazy as _
 from django.utils.translation import override
 from django_scopes import scopes_disabled
 from rest_framework.authtoken.models import Token
+from rules.contrib.models import RulesModelBase, RulesModelMixin
 
+from pretalx.common.exceptions import UserDeletionError
 from pretalx.common.image import create_thumbnail
 from pretalx.common.models import TIMEZONE_CHOICES
 from pretalx.common.models.mixins import FileCleanupMixin, GenerateCode
 from pretalx.common.text.path import path_with_hash
 from pretalx.common.urls import EventUrls, build_absolute_uri
+from pretalx.person.rules import is_administrator
+
+from ..signals import delete_user as delete_user_signal
 
 
 def avatar_path(instance, filename):
@@ -71,7 +78,23 @@ class UserManager(BaseUserManager):
         return user
 
 
-class User(PermissionsMixin, GenerateCode, FileCleanupMixin, AbstractBaseUser):
+def validate_username(value):
+    from pretalx.common.templatetags.rich_text import render_markdown
+
+    result = render_markdown(value)[3:-4]  # strip <p> tags
+    result = html.unescape(result)  # permit single <, > etc
+    if result != value:
+        raise ValidationError(_("Your username must not contain HTML or other markup."))
+
+
+class User(
+    PermissionsMixin,
+    RulesModelMixin,
+    GenerateCode,
+    FileCleanupMixin,
+    AbstractBaseUser,
+    metaclass=RulesModelBase,
+):
     """The pretalx user model.
 
     Users describe all kinds of persons who interact with pretalx: Organisers, reviewers, submitters, speakers.
@@ -102,6 +125,7 @@ class User(PermissionsMixin, GenerateCode, FileCleanupMixin, AbstractBaseUser):
         help_text=_(
             "Please enter the name you wish to be displayed publicly. This name will be used for all events you are participating in on this server."
         ),
+        validators=[validate_username],
     )
     email = models.EmailField(
         unique=True,
@@ -161,6 +185,11 @@ class User(PermissionsMixin, GenerateCode, FileCleanupMixin, AbstractBaseUser):
     )
     pw_reset_time = models.DateTimeField(null=True, verbose_name="Password reset time")
 
+    class Meta:
+        rules_permissions = {
+            "administrator": is_administrator,
+        }
+
     def __str__(self) -> str:
         """For public consumption as it is used for Select widgets, e.g. on the
         feedback form."""
@@ -170,7 +199,7 @@ class User(PermissionsMixin, GenerateCode, FileCleanupMixin, AbstractBaseUser):
         super().__init__(*args, **kwargs)
         self.permission_cache = {}
         self.event_profile_cache = {}
-        self.team_permissions = {}
+        self.event_permission_cache = {}
 
     def has_perm(self, perm, obj, *args, **kwargs):
         cached_result = None
@@ -186,7 +215,7 @@ class User(PermissionsMixin, GenerateCode, FileCleanupMixin, AbstractBaseUser):
         """Returns a user's name or 'Unnamed user'."""
         return str(self)
 
-    def save(self, *args, **kwargs):
+    def save(self, *args, skip_gravatar_processing=False, **kwargs):
         self.email = self.email.lower().strip()
         result = super().save(*args, **kwargs)
 
@@ -194,7 +223,7 @@ class User(PermissionsMixin, GenerateCode, FileCleanupMixin, AbstractBaseUser):
         update_gravatar = (
             not kwargs.get("update_fields") or "get_gravatar" in kwargs["update_fields"]
         )
-        if self.get_gravatar and update_gravatar:
+        if self.get_gravatar and update_gravatar and not skip_gravatar_processing:
             from pretalx.person.tasks import gravatar_cache
 
             gravatar_cache.apply_async(args=(self.pk,), ignore_result=True)
@@ -206,7 +235,7 @@ class User(PermissionsMixin, GenerateCode, FileCleanupMixin, AbstractBaseUser):
         :class:`~pretalx.person.models.profile.SpeakerProfile` for this user.
 
         :type event: :class:`pretalx.event.models.event.Event`
-        :retval: :class:`pretalx.person.models.profile.EventProfile`
+        :retval: :class:`~pretalx.person.models.profile.EventProfile`
         """
         if profile := self.event_profile_cache.get(event.pk):
             return profile
@@ -301,6 +330,7 @@ class User(PermissionsMixin, GenerateCode, FileCleanupMixin, AbstractBaseUser):
             answer.delete()  # Iterate to delete answer files, too
         for team in self.teams.all():
             team.members.remove(self)
+        delete_user_signal.send(None, user=self, db_delete=True)
 
     deactivate.alters_data = True
 
@@ -315,12 +345,13 @@ class User(PermissionsMixin, GenerateCode, FileCleanupMixin, AbstractBaseUser):
                 or self.teams.count()
                 or self.answers.count()
             ):
-                raise Exception(
+                raise UserDeletionError(
                     f"Cannot delete user <{self.email}> because they have submissions, answers, or teams. Please deactivate this user instead."
                 )
             self.logged_actions().delete()
             self.own_actions().update(person=None)
             self._delete_files()
+            delete_user_signal.send(None, user=self, db_delete=True)
             self.delete()
 
     shred.alters_data = True
@@ -335,7 +366,7 @@ class User(PermissionsMixin, GenerateCode, FileCleanupMixin, AbstractBaseUser):
 
     @cached_property
     def has_avatar(self) -> bool:
-        return self.avatar and self.avatar != "False"
+        return bool(self.avatar) and self.avatar != "False"
 
     @cached_property
     def avatar_url(self) -> str:
@@ -408,6 +439,8 @@ class User(PermissionsMixin, GenerateCode, FileCleanupMixin, AbstractBaseUser):
 
         :type event: :class:`~pretalx.event.models.event.Event`
         """
+        if permissions := self.event_permission_cache.get(event.pk):
+            return permissions
         if self.is_administrator:
             return {
                 "can_create_events",
@@ -417,10 +450,12 @@ class User(PermissionsMixin, GenerateCode, FileCleanupMixin, AbstractBaseUser):
                 "can_change_submissions",
                 "is_reviewer",
             }
+        permissions = set()
         teams = event.teams.filter(members__in=[self])
-        if not teams:
-            return set()
-        return set().union(*[team.permission_set for team in teams])
+        if teams:
+            permissions = set().union(*[team.permission_set for team in teams])
+        self.event_permission_cache[event.pk] = permissions
+        return permissions
 
     def regenerate_token(self) -> Token:
         """Generates a new API access token, deleting the old one."""
@@ -520,3 +555,44 @@ the pretalx team"""
         self.log_action(action="pretalx.user.password.changed", person=self)
 
     change_password.alters_data = True
+
+    @transaction.atomic
+    def change_email(self, new_email):
+        from pretalx.mail.models import QueuedMail
+
+        old_email = self.email
+        self.email = new_email.lower().strip()
+        self.save(update_fields=["email"])
+
+        context = {
+            "name": self.name or "",
+            "old_email": old_email,
+            "new_email": self.email,
+        }
+        mail_text = _(
+            """Hi {name},
+
+This is a confirmation that the email address for your pretalx account has been changed from {old_email} to {new_email}.
+
+If you did not perform this change, please contact an administrator immediately.
+
+All the best,
+the pretalx team"""
+        )
+
+        with override(self.locale):
+            QueuedMail(
+                subject=_("[pretalx] Email address changed"),
+                text=str(mail_text).format(**context),
+                to=old_email,
+                locale=self.locale,
+            ).send()
+
+        self.log_action(
+            action="pretalx.user.email.update",
+            person=self,
+            orga=False,
+            data={"old_email": old_email, "new_email": self.email},
+        )
+
+    change_email.alters_data = True

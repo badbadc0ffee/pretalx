@@ -84,6 +84,8 @@ class CfP(PretalxModel):
     :param deadline: The regular deadline. Please note that submissions can be available for longer than this if different deadlines are configured on single submission types.
     """
 
+    log_prefix = "pretalx.cfp"
+
     event = models.OneToOneField(to="event.Event", on_delete=models.PROTECT)
     headline = I18nCharField(
         max_length=300, null=True, blank=True, verbose_name=_("headline")
@@ -115,15 +117,15 @@ class CfP(PretalxModel):
         base = "{self.event.orga_urls.cfp}"
         editor = "{base}flow/"
         questions = "{base}questions/"
-        new_question = "{questions}new"
-        remind_questions = "{questions}remind"
+        new_question = "{questions}new/"
+        remind_questions = "{questions}remind/"
         text = edit_text = "{base}text"
         types = "{base}types/"
         new_type = "{types}new"
         tracks = "{base}tracks/"
-        new_track = "{tracks}new"
+        new_track = "{tracks}new/"
         access_codes = "{base}access-codes/"
-        new_access_code = "{access_codes}new"
+        new_access_code = "{access_codes}new/"
         public = "{self.event.urls.base}cfp"
         submit = "{self.event.urls.base}submit/"
 

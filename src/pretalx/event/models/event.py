@@ -26,6 +26,12 @@ from pretalx.common.text.daterange import daterange
 from pretalx.common.text.path import path_with_hash
 from pretalx.common.text.phrases import phrases
 from pretalx.common.urls import EventUrls
+from pretalx.event.rules import (
+    can_change_event_settings,
+    can_create_events,
+    has_any_permission,
+    is_event_visible,
+)
 
 # Slugs need to start and end with an alphanumeric character,
 # but may contain dashes and dots in between.
@@ -85,6 +91,7 @@ def default_feature_flags():
         "use_submission_comments": True,
         "present_multiple_times": False,
         "submission_public_review": True,
+        "speakers_can_edit_submissions": True,
     }
 
 
@@ -328,14 +335,14 @@ class Event(PretalxModel):
         compose_mails_teams = "{compose_mails}/teams/"
         send_drafts_reminder = "{compose_mails}/reminders"
         mail_templates = "{mail}templates/"
-        new_template = "{mail_templates}new"
+        new_template = "{mail_templates}new/"
         outbox = "{mail}outbox/"
         sent_mails = "{mail}sent"
         send_outbox = "{outbox}send"
         purge_outbox = "{outbox}purge"
         submissions = "{base}submissions/"
         tags = "{submissions}tags/"
-        new_tag = "{tags}new"
+        new_tag = "{tags}new/"
         submission_cards = "{base}submissions/cards/"
         stats = "{base}submissions/statistics/"
         submission_feed = "{base}submissions/feed/"
@@ -350,7 +357,7 @@ class Event(PretalxModel):
         team_settings = "{settings}team/"
         new_team = "{settings}team/new"
         room_settings = "{schedule}rooms/"
-        new_room = "{room_settings}new"
+        new_room = "{room_settings}new/"
         schedule = "{base}schedule/"
         schedule_export = "{schedule}export/"
         schedule_export_trigger = "{schedule_export}trigger"
@@ -364,33 +371,46 @@ class Event(PretalxModel):
         talks_api = "{schedule_api}talks/"
         plugins = "{settings}plugins"
         information = "{base}info/"
-        new_information = "{base}info/new"
+        new_information = "{base}info/new/"
 
     class api_urls(EventUrls):
         base = "/api/events/{self.slug}/"
         submissions = "{base}submissions/"
+        slots = "{base}slots/"
         talks = "{base}talks/"
         schedules = "{base}schedules/"
         speakers = "{base}speakers/"
         reviews = "{base}reviews/"
         rooms = "{base}rooms/"
         questions = "{base}questions/"
+        question_options = "{base}question-options/"
         answers = "{base}answers/"
         tags = "{base}tags/"
+        tracks = "{base}tracks/"
+        submission_types = "{base}submission-types/"
+        mail_templates = "{base}mail-templates/"
+        access_codes = "{base}access-codes/"
+        speaker_information = "{base}speaker-information/"
 
     class Meta:
         ordering = ("date_from",)
+        rules_permissions = {
+            "orga_access": has_any_permission,
+            "view": is_event_visible | has_any_permission,
+            "update": can_change_event_settings,
+            "create": can_create_events,
+        }
 
     def __str__(self) -> str:
         return str(self.name)
 
     @cached_property
-    def locales(self) -> list:
+    def locales(self) -> list[str]:
         """Is a list of active event locales."""
         return self.locale_array.split(",")
 
     @cached_property
-    def content_locales(self) -> list:
+    def content_locales(self) -> list[str]:
         """Is a list of active content locales."""
         return self.content_locale_array.split(",")
 
@@ -452,11 +472,11 @@ class Event(PretalxModel):
         """
         return ObjectRelatedCache(self, field="slug")
 
-    def save(self, *args, **kwargs):
+    def save(self, *args, skip_initial_data=False, **kwargs):
         was_created = not bool(self.pk)
         super().save(*args, **kwargs)
 
-        if was_created:
+        if was_created and not skip_initial_data:
             self.build_initial_data()
 
     @property
@@ -772,11 +792,9 @@ class Event(PretalxModel):
 
     @cached_property
     def current_schedule(self):
-        """Returns the latest released.
-
-        :class:`~pretalx.schedule.models.schedule.Schedule`, or ``None`` before
-        the first release.
-        """
+        if pk := getattr(self, "_current_schedule_pk", None):
+            # The event middleware prefetches the current schedule
+            return self.schedules.get(pk=pk)
         return (
             self.schedules.order_by("-published")
             .filter(published__isnull=False)
@@ -810,11 +828,10 @@ class Event(PretalxModel):
     def teams(self):
         """Returns all :class:`~pretalx.event.models.organiser.Team` objects
         that concern this event."""
-        from pretalx.event.models.organiser import Team
 
-        return Team.objects.filter(
-            models.Q(limit_events__in=[self]) | models.Q(all_events=True),
-            organiser=self.organiser,
+        return self.organiser.teams.all().filter(
+            models.Q(all_events=True)
+            | models.Q(models.Q(all_events=False) & models.Q(limit_events__in=[self]))
         )
 
     @cached_property
@@ -884,6 +901,7 @@ class Event(PretalxModel):
         for i, phase in enumerate(phases):
             phase.position = i
             phase.save(update_fields=["position"])
+        return phases
 
     def update_review_phase(self):
         """This method activates the next review phase if the current one is
@@ -893,16 +911,24 @@ class Event(PretalxModel):
         activate.
         """
         _now = now()
-        future_phases = self.review_phases.all()
-        old_phase = self.active_review_phase
-        if old_phase and old_phase.end and old_phase.end > _now:
-            return old_phase
+        active_phase = self.active_review_phase
+        if active_phase and (not active_phase.end or active_phase.end >= _now):
+            return active_phase
         self.reorder_review_phases()
-        old_position = old_phase.position if old_phase else -1
-        future_phases = future_phases.filter(position__gt=old_position)
-        next_phase = future_phases.order_by("position").first()
-        if not next_phase or not next_phase.start or next_phase.start > _now:
-            return old_phase
+        next_phase = (
+            self.review_phases.all()
+            .filter(
+                models.Q(start__isnull=True) | models.Q(start__lte=_now),
+                models.Q(end__isnull=True) | models.Q(end__gte=_now),
+            )
+            .order_by("position")
+            .first()
+        )
+        if not next_phase:
+            if active_phase:
+                active_phase.is_active = False
+                active_phase.save()
+            return
         next_phase.activate()
         return next_phase
 
@@ -919,9 +945,7 @@ class Event(PretalxModel):
 
         if self.current_schedule:
             return (
-                self.submissions.filter(
-                    slots__in=self.current_schedule.talks.filter(is_visible=True)
-                )
+                self.submissions.filter(slots__in=self.current_schedule.scheduled_talks)
                 .select_related("submission_type")
                 .prefetch_related("speakers")
             )
@@ -1022,6 +1046,19 @@ class Event(PretalxModel):
                 to=self.email,
                 locale=self.locale,
             ).send()
+
+    @property
+    def has_unreleased_schedule_changes(self) -> bool:
+        """Returns True if there are unreleased changes in the WIP schedule.
+
+        This property is cached for 24 hours and automatically updated when:
+        - WIP schedule changes are recalculated
+        - Talks are rescheduled
+        - A schedule is released
+        """
+        from pretalx.schedule.services import has_unreleased_schedule_changes
+
+        return has_unreleased_schedule_changes(self)
 
     @transaction.atomic
     def shred(self, person=None):

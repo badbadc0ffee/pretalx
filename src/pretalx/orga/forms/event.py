@@ -7,8 +7,10 @@ from django import forms
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
+from django.core.validators import RegexValidator
 from django.db.models import F, Q
 from django.forms import inlineformset_factory
+from django.utils.text import format_lazy
 from django.utils.translation import gettext_lazy as _
 from django_scopes.forms import SafeModelMultipleChoiceField
 from i18nfield.fields import I18nFormField, I18nTextarea
@@ -415,6 +417,18 @@ class MailSettingsForm(
             attrs={"autocomplete": "new-password"},
             render_value=True,
         ),
+        validators=[
+            RegexValidator(
+                r"^[A-Za-z0-9!\"#$%&'()*+,./:;<=>?@\^_`{}|~-]+$",
+                message=format_lazy(
+                    _(
+                        "The password contains unsupported letters. Please only use characters "
+                        "A-Z, a-z, 0-9, and common special characters ({characters})."
+                    ),
+                    characters=r'!"#$%%&\'()*+,-./:;<=>?@\^_`{}|~',
+                ),
+            )
+        ],
     )
     smtp_use_tls = forms.BooleanField(
         label=_("Use STARTTLS"),
@@ -612,6 +626,17 @@ class WidgetGenerationForm(forms.ModelForm):
 class ReviewPhaseForm(I18nHelpText, I18nModelForm):
     def __init__(self, *args, event=None, **kwargs):
         super().__init__(*args, **kwargs)
+
+        if event and not event.get_feature_flag("speakers_can_edit_submissions"):
+            self.fields["speakers_can_change_submissions"].disabled = True
+            self.fields["speakers_can_change_submissions"].initial = False
+            link_tag = f'<a href="{event.cfp.urls.text}">{_("Change this in the CfP settings")}</a>'
+            help_text = _(
+                "Speaker editing is currently disabled at the event level. "
+                "{link_tag} to enable speaker editing."
+            ).format(link_tag=link_tag)
+            help_text = f'<span class="text-danger">{help_text}</span>'
+            self.fields["speakers_can_change_submissions"].help_text = help_text
 
     def clean(self):
         data = super().clean()

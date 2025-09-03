@@ -1,7 +1,6 @@
 import collections
 import datetime as dt
 import json
-from contextlib import suppress
 
 import dateutil.parser
 from csp.decorators import csp_update
@@ -9,9 +8,8 @@ from django.conf import settings
 from django.contrib import messages
 from django.db.models.deletion import ProtectedError
 from django.http import FileResponse, JsonResponse
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import redirect
 from django.utils.decorators import method_decorator
-from django.utils.functional import cached_property
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 from django.views.decorators.csrf import csrf_exempt
@@ -26,15 +24,16 @@ from pretalx.agenda.views.utils import get_schedule_exporters
 from pretalx.common.language import get_current_language_information
 from pretalx.common.text.path import safe_filename
 from pretalx.common.text.phrases import phrases
-from pretalx.common.views import CreateOrUpdateView
+from pretalx.common.views.generic import OrgaCRUDView
 from pretalx.common.views.mixins import (
-    ActionFromUrl,
     EventPermissionRequired,
+    OrderActionMixin,
     PermissionRequired,
 )
 from pretalx.orga.forms.schedule import ScheduleExportForm, ScheduleReleaseForm
 from pretalx.schedule.forms import QuickScheduleForm, RoomForm
 from pretalx.schedule.models import Availability, Room, TalkSlot
+from pretalx.schedule.tasks import task_update_unreleased_schedule_changes
 
 SCRIPT_SRC = "'self' 'unsafe-eval'"
 DEFAULT_SRC = "'self'"
@@ -48,11 +47,14 @@ if settings.VITE_DEV_MODE:
 
 
 @method_decorator(
-    csp_update(SCRIPT_SRC=SCRIPT_SRC, DEFAULT_SRC=DEFAULT_SRC), name="dispatch"
+    csp_update(
+        {"script-src": SCRIPT_SRC, "default-src": DEFAULT_SRC}, DEFAULT_SRC=DEFAULT_SRC
+    ),
+    name="dispatch",
 )
 class ScheduleView(EventPermissionRequired, TemplateView):
     template_name = "orga/schedule/index.html"
-    permission_required = "orga.view_schedule"
+    permission_required = "schedule.orga_view_schedule"
 
     def get_context_data(self, **kwargs):
         result = super().get_context_data(**kwargs)
@@ -74,7 +76,7 @@ class ScheduleView(EventPermissionRequired, TemplateView):
 
 class ScheduleExportView(EventPermissionRequired, FormView):
     template_name = "orga/schedule/export.html"
-    permission_required = "orga.change_settings"
+    permission_required = "event.update_event"
     form_class = ScheduleExportForm
 
     def get_form_kwargs(self):
@@ -107,10 +109,10 @@ class ScheduleExportView(EventPermissionRequired, FormView):
 
 
 class ScheduleExportTriggerView(EventPermissionRequired, View):
-    permission_required = "orga.change_settings"
+    permission_required = "event.update_event"
 
     def post(self, request, event):
-        if settings.HAS_CELERY:
+        if not settings.CELERY_TASK_ALWAYS_EAGER:
             export_schedule_html.apply_async(
                 kwargs={"event_id": self.request.event.id}, ignore_result=True
             )
@@ -131,7 +133,7 @@ class ScheduleExportTriggerView(EventPermissionRequired, View):
 
 
 class ScheduleExportDownloadView(EventPermissionRequired, View):
-    permission_required = "orga.change_settings"
+    permission_required = "event.update_event"
 
     def get(self, request, event):
         try:
@@ -153,7 +155,7 @@ class ScheduleExportDownloadView(EventPermissionRequired, View):
 
 class ScheduleReleaseView(EventPermissionRequired, FormView):
     form_class = ScheduleReleaseForm
-    permission_required = "orga.release_schedule"
+    permission_required = "schedule.release_schedule"
     template_name = "orga/schedule/release.html"
 
     def get_form_kwargs(self):
@@ -192,7 +194,7 @@ class ScheduleReleaseView(EventPermissionRequired, FormView):
 
 
 class ScheduleResetView(EventPermissionRequired, View):
-    permission_required = "orga.edit_schedule"
+    permission_required = "schedule.release_schedule"
 
     def dispatch(self, request, event):
         super().dispatch(request, event)
@@ -214,7 +216,7 @@ class ScheduleResetView(EventPermissionRequired, View):
 
 
 class ScheduleToggleView(EventPermissionRequired, View):
-    permission_required = "orga.edit_schedule"
+    permission_required = "event.update_event"
 
     def dispatch(self, request, event):
         super().dispatch(request, event)
@@ -226,7 +228,7 @@ class ScheduleToggleView(EventPermissionRequired, View):
 
 
 class ScheduleResendMailsView(EventPermissionRequired, View):
-    permission_required = "orga.edit_schedule"
+    permission_required = "schedule.release_schedule"
 
     def dispatch(self, request, event):
         super().dispatch(request, event)
@@ -298,7 +300,7 @@ def serialize_slot(slot, warnings=None):
 
 
 class TalkList(EventPermissionRequired, View):
-    permission_required = "orga.edit_schedule"
+    permission_required = "schedule.release_schedule"
 
     def get(self, request, event):
         version = self.request.GET.get("version")
@@ -355,11 +357,14 @@ class TalkList(EventPermissionRequired, View):
             start=start,
             end=end,
         )
+        task_update_unreleased_schedule_changes.apply_async(
+            kwargs={"event": request.event.slug}
+        )
         return JsonResponse(serialize_break(slot))
 
 
 class ScheduleWarnings(EventPermissionRequired, View):
-    permission_required = "orga.edit_schedule"
+    permission_required = "schedule.release_schedule"
 
     def get(self, request, event):
         return JsonResponse(
@@ -371,7 +376,7 @@ class ScheduleWarnings(EventPermissionRequired, View):
 
 
 class ScheduleAvailabilities(EventPermissionRequired, View):
-    permission_required = "orga.edit_schedule"
+    permission_required = "schedule.release_schedule"
 
     def get(self, request, event):
         return JsonResponse(
@@ -385,13 +390,7 @@ class ScheduleAvailabilities(EventPermissionRequired, View):
         # Serializing by hand because it's faster and we don't need
         # IDs or allDay
         return {
-            room.pk: [
-                {
-                    "start": av.start.isoformat(),
-                    "end": av.end.isoformat(),
-                }
-                for av in room.availabilities.all()
-            ]
+            room.pk: [av.serialize(full=False) for av in room.availabilities.all()]
             for room in self.request.event.rooms.all().prefetch_related(
                 "availabilities"
             )
@@ -415,10 +414,7 @@ class ScheduleAvailabilities(EventPermissionRequired, View):
         ):
             if talk.submission.speakers.count() == 1:
                 result[talk.id] = [
-                    {
-                        "start": av.start.isoformat(),
-                        "end": av.end.isoformat(),
-                    }
+                    av.serialize(full=False)
                     for av in speaker_avails[talk.submission.speakers.first().pk]
                 ]
             else:
@@ -431,20 +427,14 @@ class ScheduleAvailabilities(EventPermissionRequired, View):
                     result[talk.id] = []
                 else:
                     result[talk.id] = [
-                        {
-                            "start": av.start.isoformat(),
-                            "end": av.end.isoformat(),
-                        }
+                        av.serialize(full=False)
                         for av in Availability.intersection(*all_speaker_avails)
                     ]
         return result
 
 
 class TalkUpdate(PermissionRequired, View):
-    permission_required = "orga.schedule_talk"
-
-    def get_permission_object(self):
-        return self.request.event
+    permission_required = "schedule.update_talkslot"
 
     def get_object(self):
         return self.request.event.wip_schedule.talks.filter(
@@ -491,6 +481,9 @@ class TalkUpdate(PermissionRequired, View):
 
         with_speakers = self.request.event.cfp.request_availabilities
         warnings = talk.schedule.get_talk_warnings(talk, with_speakers=with_speakers)
+        task_update_unreleased_schedule_changes.apply_async(
+            kwargs={"event": request.event.slug}
+        )
 
         return JsonResponse(serialize_slot(talk, warnings=warnings))
 
@@ -501,11 +494,14 @@ class TalkUpdate(PermissionRequired, View):
         if talk.submission:
             return JsonResponse({"error": "Cannot delete talk."})
         talk.delete()
+        task_update_unreleased_schedule_changes.apply_async(
+            kwargs={"event": request.event.slug}
+        )
         return JsonResponse({"success": True})
 
 
 class QuickScheduleView(PermissionRequired, UpdateView):
-    permission_required = "orga.schedule_talk"
+    permission_required = "schedule.update_talkslot"
     form_class = QuickScheduleForm
     template_name = "orga/schedule/quick.html"
 
@@ -522,40 +518,41 @@ class QuickScheduleView(PermissionRequired, UpdateView):
     def form_valid(self, form):
         form.save()
         messages.success(self.request, _("The session has been scheduled."))
+        task_update_unreleased_schedule_changes.apply_async(
+            kwargs={"event": self.request.event.slug}
+        )
         return super().form_valid(form)
 
     def get_success_url(self):
         return self.request.path
 
 
-class RoomList(EventPermissionRequired, TemplateView):
-    template_name = "orga/schedule/room_list.html"
-    permission_required = "orga.change_settings"
+class RoomView(OrderActionMixin, OrgaCRUDView):
+    model = Room
+    form_class = RoomForm
+    template_namespace = "orga/schedule"
 
-    def post(self, request, *args, **kwargs):
-        order = request.POST.get("order")
-        if order:
-            order = order.split(",")
-        for index, pk in enumerate(order):
-            room = get_object_or_404(Room.objects, event=request.event, pk=pk)
-            room.position = index
-            room.save(update_fields=["position"])
-        return self.get(request, *args, **kwargs)
+    def get_queryset(self):
+        return self.request.event.rooms.all()
 
+    def get_permission_required(self):
+        permission_map = {"list": "orga_list", "detail": "orga_detail"}
+        permission = permission_map.get(self.action, self.action)
+        return self.model.get_perm(permission)
 
-class RoomDelete(EventPermissionRequired, View):
-    permission_required = "orga.change_settings"
-
-    def get_object(self):
-        return self.request.event.rooms.filter(pk=self.kwargs["pk"]).first()
-
-    def dispatch(self, request, event, pk):
-        super().dispatch(request, event, pk)
-        try:
-            self.get_object().delete()
-            messages.success(
-                self.request, _("Room deleted. Hopefully nobody was still in there …")
+    def get_generic_title(self, instance=None):
+        if instance:
+            return (
+                _("Room")
+                + f" {phrases.base.quotation_open}{instance.name}{phrases.base.quotation_close}"
             )
+        if self.action == "create":
+            return _("New room")
+        return _("Rooms")
+
+    def delete_handler(self, request, *args, **kwargs):
+        try:
+            return super().delete_handler(request, *args, **kwargs)
         except ProtectedError:
             messages.error(
                 request,
@@ -563,50 +560,4 @@ class RoomDelete(EventPermissionRequired, View):
                     "There is or was a session scheduled in this room. It cannot be deleted."
                 ),
             )
-
-        return redirect(request.event.orga_urls.room_settings)
-
-
-@method_decorator(csp_update(SCRIPT_SRC="'self' 'unsafe-eval'"), name="dispatch")
-class RoomDetail(EventPermissionRequired, ActionFromUrl, CreateOrUpdateView):
-    model = Room
-    form_class = RoomForm
-    template_name = "orga/schedule/room_form.html"
-    permission_required = "orga.view_room"
-
-    @cached_property
-    def write_permission_required(self):
-        if "pk" not in self.kwargs:
-            return "orga.change_settings"
-        return "orga.edit_room"
-
-    def get_object(self):
-        with suppress(Room.DoesNotExist, KeyError):
-            return self.request.event.rooms.get(pk=self.kwargs["pk"])
-
-    @property
-    def permission_object(self):
-        return self.get_object() or self.request.event
-
-    def get_success_url(self) -> str:
-        return self.request.event.orga_urls.room_settings
-
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        kwargs["event"] = self.request.event
-        return kwargs
-
-    def form_valid(self, form):
-        form.instance.event = self.request.event
-        created = not bool(form.instance.pk)
-        result = super().form_valid(form)
-        messages.success(self.request, _("Saved!"))
-        if created:
-            form.instance.log_action(
-                "pretalx.room.create", person=self.request.user, orga=True
-            )
-        else:
-            form.instance.log_action(
-                "pretalx.event.update", person=self.request.user, orga=True
-            )
-        return result
+            return self.delete_view(request, *args, **kwargs)

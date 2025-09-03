@@ -21,12 +21,12 @@ from pretalx.submission.models import Submission, SubmissionStates
 
 
 class TalkMixin(PermissionRequired):
-    permission_required = "agenda.view_submission"
+    permission_required = "submission.view_public_submission"
+    prefetches = ("slots", "resources", "speakers")
 
     def get_queryset(self):
         return self.request.event.submissions.prefetch_related(
-            "slots",
-            "resources",
+            *self.prefetches
         ).select_related("submission_type", "track", "event")
 
     @cached_property
@@ -43,6 +43,18 @@ class TalkMixin(PermissionRequired):
 
     def get_permission_object(self):
         return self.submission
+
+    @context
+    @cached_property
+    def scheduling_information_visible(self):
+        return self.request.user.has_perm(
+            "submission.view_scheduling_details_submission", self.submission
+        )
+
+    @context
+    @cached_property
+    def hide_speaker_links(self):
+        return not self.scheduling_information_visible
 
 
 class TalkView(TalkMixin, TemplateView):
@@ -67,19 +79,17 @@ class TalkView(TalkMixin, TemplateView):
 
     def get(self, request, *args, **kwargs):
         response = super().get(request, *args, **kwargs)
-        csp_update = {}
-        if self.recording.get("csp_header"):
-            csp_update["frame-src"] = self.recording.get("csp_header")
+        csp_update = {"frame-src": self.recording.get("csp_header")}
         response._csp_update = csp_update
         return response
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        schedule = self.request.event.current_schedule
-        if not schedule and self.request.user.has_perm(
-            "orga.view_schedule", self.request.event
-        ):
-            schedule = self.request.event.wip_schedule
+        schedule = (
+            self.request.event.current_schedule or self.request.event.wip_schedule
+        )
+        if not self.request.user.has_perm("schedule.view_schedule", schedule):
+            return ctx
         qs = (
             schedule.talks.filter(room__isnull=False).select_related("room")
             if schedule
@@ -133,7 +143,33 @@ class TalkView(TalkMixin, TemplateView):
     @context
     @cached_property
     def answers(self):
-        return self.submission.public_answers
+        from pretalx.submission.models.question import QuestionVariant
+
+        all_answers = self.submission.public_answers
+        regular_answers = []
+        icon_answers = []
+
+        for answer in all_answers:
+            if answer.question.variant == QuestionVariant.URL and answer.question.icon:
+                icon_answers.append(answer)
+            else:
+                regular_answers.append(answer)
+
+        return regular_answers
+
+    @context
+    @cached_property
+    def icon_answers(self):
+        from pretalx.submission.models.question import QuestionVariant
+
+        all_answers = self.submission.public_answers
+        icon_answers = []
+
+        for answer in all_answers:
+            if answer.question.variant == QuestionVariant.URL and answer.question.icon:
+                icon_answers.append(answer)
+
+        return icon_answers
 
 
 class TalkReviewView(TalkView):
@@ -165,6 +201,7 @@ class TalkReviewView(TalkView):
 
 
 class SingleICalView(EventPageMixin, TalkMixin, View):
+    prefetches = ("slots",)
 
     def get(self, request, event, **kwargs):
         code = self.submission.code
@@ -188,14 +225,7 @@ class SingleICalView(EventPageMixin, TalkMixin, View):
 
 class FeedbackView(TalkMixin, FormView):
     form_class = FeedbackForm
-    permission_required = "agenda.view_feedback_page"
-
-    def get_queryset(self):
-        return self.request.event.submissions.prefetch_related(
-            "slots",
-            "feedback",
-            "speakers",
-        ).select_related("submission_type")
+    permission_required = "submission.view_feedback_page_submission"
 
     @context
     @cached_property
@@ -205,7 +235,9 @@ class FeedbackView(TalkMixin, FormView):
     @context
     @cached_property
     def can_give_feedback(self):
-        return self.request.user.has_perm("agenda.give_feedback", self.talk)
+        return self.request.user.has_perm(
+            "submission.give_feedback_submission", self.talk
+        )
 
     @context
     @cached_property

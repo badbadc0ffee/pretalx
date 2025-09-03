@@ -3,7 +3,7 @@ name = "pretalx"
 dynamic = ["version"]
 description = "Conference organisation: CfPs, scheduling, much more"
 readme = "README.rst"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 keywords = ["conference", "event", "schedule", "talk", "cfp"]
 authors = [
   {name = "Tobias Kunze", email = "r@rixx.de"},
@@ -14,7 +14,7 @@ maintainers = [
 classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Environment :: Web Environment",
-  "Framework :: Django :: 5.1",
+  "Framework :: Django :: 5.2",
   "Intended Audience :: Developers",
   "Intended Audience :: Other Audience",
   "License :: OSI Approved :: Apache Software License",
@@ -22,7 +22,8 @@ classifiers = [
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
 ]
 
@@ -30,31 +31,33 @@ dependencies = [
   "beautifulsoup4[lxml]~=4.13.0",
   "bleach~=6.2.0",
   "celery~=5.5.0",
-  "css_inline~=0.14.0",
+  "css_inline~=0.17.0",
   "csscompressor~=0.9.0",
   "cssutils~=2.11.0",
   "defusedcsv~=2.0.0",
   "defusedxml~=0.7.0",
-  "Django[argon2]~=5.1.0",
+  "Django[argon2]~=5.2.2",
   "django-compressor~=4.5.0",
   "django-context-decorator",
   "django-countries~=7.0",
-  "django-csp~=3.8.0",
+  "django-csp~=4.0.0",
   "django-filter==25.1",
   "django-formset-js-improved==0.5.0.3",
   "django-formtools~=2.5.1",
-  "django-hierarkey~=1.2.0",
+  "django-hierarkey~=2.0.1",
   "django-i18nfield>=1.9,<1.11",
   "django-libsass~=0.8",
   "django-scopes~=2.0.0",
   "djangorestframework~=3.16.0",
+  "drf-flex-fields~=1.0.0",
+  "drf-spectacular~=0.28.0",
   "libsass~=0.23.0",
   "Markdown~=3.8.0",
-  "Pillow~=11.2.0",
+  "Pillow~=11.3.0",
   "publicsuffixlist~=1.0.0",
   "python-dateutil~=2.9.0",
   "qrcode~=8.0",
-  "reportlab~=4.3.0",
+  "reportlab~=4.4.0",
   "requests~=2.32.0",
   "rules~=3.5.0",
   "setuptools",
@@ -71,7 +74,6 @@ dev = [
   "check-manifest",
   "coverage",
   "djhtml",
-  "Faker",
   "flake8",
   "flake8-bugbear",
   "freezegun",
@@ -89,7 +91,7 @@ dev = [
   "urllib3",
 ]
 postgres = ["psycopg2-binary~=2.9.0"]
-redis = ["redis~=5.2.0"]
+redis = ["redis~=6.4.0"]
 
 [build-system]
 build-backend = "setuptools.build_meta"

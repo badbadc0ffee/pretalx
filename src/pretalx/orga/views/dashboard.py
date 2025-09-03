@@ -15,7 +15,9 @@ from pretalx.common.text.phrases import phrases
 from pretalx.common.views.mixins import EventPermissionRequired, PermissionRequired
 from pretalx.event.models import Event, Organiser
 from pretalx.event.stages import get_stages
-from pretalx.submission.models import Review, Submission, SubmissionStates
+from pretalx.orga.signals import dashboard_tile
+from pretalx.submission.models import Submission, SubmissionStates
+from pretalx.submission.rules import get_missing_reviews
 
 
 def start_redirect_view(request):
@@ -78,7 +80,10 @@ class DashboardEventListView(TemplateView):
 
 
 class DashboardOrganiserEventListView(PermissionRequired, DashboardEventListView):
-    permission_required = "orga.view_organisers"
+    permission_required = "event.view_organiser"
+
+    def get_permission_object(self):
+        return self.request.organiser
 
     @property
     def base_queryset(self):
@@ -91,7 +96,7 @@ class DashboardOrganiserEventListView(PermissionRequired, DashboardEventListView
 
 class DashboardOrganiserListView(PermissionRequired, TemplateView):
     template_name = "orga/organiser/list.html"
-    permission_required = "orga.view_organisers"
+    permission_required = "event.list_organiser"
 
     def filter_organiser(self, organiser, query):
         name = (
@@ -128,7 +133,7 @@ class DashboardOrganiserListView(PermissionRequired, TemplateView):
 
 class EventDashboardView(EventPermissionRequired, TemplateView):
     template_name = "orga/event/dashboard.html"
-    permission_required = "orga.view_orga_area"
+    permission_required = "event.orga_access_event"
 
     def get_cfp_tiles(self, _now, can_change_submissions=False):
         result = []
@@ -201,7 +206,7 @@ class EventDashboardView(EventPermissionRequired, TemplateView):
             members__in=[self.request.user], is_reviewer=True
         ).exists()
         if is_reviewer:
-            reviews_missing = Review.find_missing_reviews(
+            reviews_missing = get_missing_reviews(
                 self.request.event, self.request.user
             ).count()
             if reviews_missing:
@@ -218,6 +223,15 @@ class EventDashboardView(EventPermissionRequired, TemplateView):
                     }
                 )
         return result
+
+    def get_plugin_tiles(self):
+        tiles = []
+        for __, response in dashboard_tile.send_robust(sender=self.request.event):
+            if isinstance(response, list):
+                tiles.extend(response)
+            else:
+                tiles.append(response)
+        return tiles
 
     @context
     def history(self):
@@ -241,9 +255,11 @@ class EventDashboardView(EventPermissionRequired, TemplateView):
         )
         _now = now()
         today = _now.date()
-        can_change_settings = self.request.user.has_perm("orga.change_settings", event)
+        can_change_settings = self.request.user.has_perm(
+            "event.change_settings.event", event
+        )
         can_change_submissions = self.request.user.has_perm(
-            "orga.change_submissions", event
+            "submission.orga_update_submission", event
         )
         result["tiles"] = self.get_cfp_tiles(
             _now, can_change_submissions=can_change_submissions
@@ -403,5 +419,6 @@ class EventDashboardView(EventPermissionRequired, TemplateView):
         result["tiles"] += self.get_review_tiles(
             can_change_settings=can_change_settings
         )
+        result["tiles"] += self.get_plugin_tiles()
         result["tiles"].sort(key=lambda tile: tile.get("priority") or 100)
         return result

@@ -21,13 +21,13 @@ from pretalx.common.views.mixins import (
     SocialMediaCardMixin,
 )
 from pretalx.person.models import SpeakerProfile, User
-from pretalx.submission.models import QuestionTarget
+from pretalx.submission.models import QuestionTarget, QuestionVariant
 
 
 class SpeakerList(EventPermissionRequired, Filterable, ListView):
     context_object_name = "speakers"
     template_name = "agenda/speakers.html"
-    permission_required = "agenda.view_schedule"
+    permission_required = "schedule.list_schedule"
     default_filters = ("user__name__icontains",)
 
     def get_queryset(self):
@@ -52,7 +52,7 @@ class SpeakerList(EventPermissionRequired, Filterable, ListView):
 
 class SpeakerView(PermissionRequired, TemplateView):
     template_name = "agenda/speaker.html"
-    permission_required = "agenda.view_speaker"
+    permission_required = "person.view_speakerprofile"
     slug_field = "code"
 
     @context
@@ -75,20 +75,51 @@ class SpeakerView(PermissionRequired, TemplateView):
             self.request.event.current_schedule.talks.filter(
                 submission__speakers__code=self.kwargs["code"], is_visible=True
             )
-            .select_related("submission", "room", "submission__event")
+            .select_related(
+                "submission", "room", "submission__event", "submission__track"
+            )
             .prefetch_related("submission__speakers")
         )
 
     def get_permission_object(self):
         return self.profile
 
-    @context
-    def answers(self):
-        return self.profile.user.answers.filter(
-            question__is_public=True,
-            question__event=self.request.event,
-            question__target=QuestionTarget.SPEAKER,
-        ).select_related("question")
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        speaker = self.profile.user
+        answers = (
+            speaker.answers.filter(
+                question__is_public=True,
+                question__event=self.request.event,
+                question__target=QuestionTarget.SPEAKER,
+            )
+            .select_related("question")
+            .order_by("question__position")
+        )
+        short_answers = []
+        long_answers = []
+        icon_answers = []
+        for answer in answers:
+            if answer.question.variant in QuestionVariant.short_answers:
+                if (
+                    answer.question.variant == QuestionVariant.URL
+                    and answer.question.icon
+                ):
+                    icon_answers.append(answer)
+                else:
+                    short_answers.append(answer)
+            else:
+                long_answers.append(answer)
+        context["short_answers"] = short_answers
+        context["long_answers"] = long_answers
+        context["icon_answers"] = icon_answers
+        context["show_avatar"] = (
+            speaker.avatar_url and self.request.event.cfp.request_avatar
+        )
+        context["show_sidebar"] = (
+            context["show_avatar"] or len(short_answers) or len(icon_answers)
+        )
+        return context
 
 
 class SpeakerRedirect(DetailView):
@@ -97,14 +128,16 @@ class SpeakerRedirect(DetailView):
     def dispatch(self, request, **kwargs):
         speaker = self.get_object()
         profile = speaker.profiles.filter(event=self.request.event).first()
-        if profile and self.request.user.has_perm("agenda.view_speaker", profile):
+        if profile and self.request.user.has_perm(
+            "person.view_speakerprofile", profile
+        ):
             return redirect(profile.urls.public.full())
         raise Http404()
 
 
 class SpeakerTalksIcalView(PermissionRequired, DetailView):
     context_object_name = "profile"
-    permission_required = "agenda.view_speaker"
+    permission_required = "person.view_speakerprofile"
     slug_field = "code"
 
     def get_object(self, queryset=None):
@@ -146,9 +179,7 @@ class SpeakerTalksIcalView(PermissionRequired, DetailView):
 
 class SpeakerSocialMediaCard(SocialMediaCardMixin, SpeakerView):
     def get_image(self):
-        user = self.profile.user
-        if user.avatar:
-            return user.avatar
+        return self.profile.avatar
 
 
 @cache_page(60 * 60)

@@ -16,6 +16,12 @@ from django.utils.translation import gettext_lazy as _
 from django.utils.translation import override, pgettext_lazy
 from django_scopes import ScopedManager
 
+from pretalx.agenda.rules import (
+    event_uses_feedback,
+    is_agenda_submission_visible,
+    is_agenda_visible,
+    is_submission_visible_via_schedule,
+)
 from pretalx.common.exceptions import SubmissionError
 from pretalx.common.models.choices import Choices
 from pretalx.common.models.mixins import GenerateCode, PretalxModel
@@ -23,6 +29,26 @@ from pretalx.common.text.path import path_with_hash
 from pretalx.common.text.phrases import phrases
 from pretalx.common.text.serialize import serialize_duration
 from pretalx.common.urls import EventUrls
+from pretalx.mail.models import get_prefixed_subject
+from pretalx.person.rules import is_reviewer
+from pretalx.submission.rules import (
+    are_featured_submissions_visible,
+    can_be_accepted,
+    can_be_canceled,
+    can_be_confirmed,
+    can_be_edited,
+    can_be_rejected,
+    can_be_removed,
+    can_be_reviewed,
+    can_be_withdrawn,
+    can_request_speakers,
+    can_view_reviews,
+    has_reviewer_access,
+    is_feedback_ready,
+    is_speaker,
+    orga_can_change_submissions,
+    orga_or_reviewer_can_change_submission,
+)
 from pretalx.submission.signals import submission_state_change
 
 
@@ -110,6 +136,27 @@ class AllSubmissionManager(models.Manager):
     pass
 
 
+class SpeakerRole(models.Model):
+    """Through model connecting speaker and submission."""
+
+    submission = models.ForeignKey(
+        to="submission.Submission",
+        on_delete=models.CASCADE,
+        related_name="speaker_roles",
+    )
+    user = models.ForeignKey(
+        to="person.User", on_delete=models.CASCADE, related_name="speaker_roles"
+    )
+
+    objects = ScopedManager(event="submission__event")
+
+    class Meta:
+        unique_together = (("submission", "user"),)
+
+    def __str__(self):
+        return f"SpeakerRole(submission={self.submission.code}, speaker={self.user})"
+
+
 class Submission(GenerateCode, PretalxModel):
     """Submissions are, next to :class:`~pretalx.event.models.event.Event`, the
     central model in pretalx.
@@ -133,7 +180,10 @@ class Submission(GenerateCode, PretalxModel):
 
     code = models.CharField(max_length=16, unique=True)
     speakers = models.ManyToManyField(
-        to="person.User", related_name="submissions", blank=True
+        to="person.User",
+        related_name="submissions",
+        through=SpeakerRole,
+        blank=True,
     )
     event = models.ForeignKey(
         to="event.Event", on_delete=models.PROTECT, related_name="submissions"
@@ -256,6 +306,45 @@ class Submission(GenerateCode, PretalxModel):
     )
     all_objects = ScopedManager(event="event", _manager_class=AllSubmissionManager)
 
+    log_prefix = "pretalx.submission"
+
+    class Meta:
+        rules_permissions = {
+            "list": is_agenda_visible | orga_can_change_submissions | is_reviewer,
+            "list_featured": are_featured_submissions_visible
+            | orga_can_change_submissions,
+            "view": is_agenda_submission_visible
+            | is_speaker
+            | orga_can_change_submissions
+            | has_reviewer_access,
+            "view_public": is_agenda_submission_visible | orga_can_change_submissions,
+            "orga_list": orga_can_change_submissions | is_reviewer,
+            "orga_update": orga_can_change_submissions,
+            "review": has_reviewer_access & can_be_reviewed,
+            "view_reviews": has_reviewer_access | orga_can_change_submissions,
+            "view_all_reviews": (has_reviewer_access & can_view_reviews)
+            | orga_can_change_submissions,
+            "create": orga_can_change_submissions,
+            "update": (can_be_edited & is_speaker) | orga_can_change_submissions,
+            "delete": orga_can_change_submissions,
+            "state_change": orga_or_reviewer_can_change_submission,
+            "accept_or_reject": orga_or_reviewer_can_change_submission,
+            "withdraw": can_be_withdrawn & is_speaker,
+            "reject": can_be_rejected & orga_or_reviewer_can_change_submission,
+            "accept": can_be_accepted & orga_or_reviewer_can_change_submission,
+            "confirm": can_be_confirmed & (is_speaker | orga_can_change_submissions),
+            "cancel": can_be_canceled & orga_can_change_submissions,
+            "remove": can_be_removed & orga_can_change_submissions,
+            "view_feedback_page": event_uses_feedback & is_agenda_submission_visible,
+            "view_scheduling_details": is_submission_visible_via_schedule,
+            "view_feedback": is_speaker
+            | has_reviewer_access
+            | orga_can_change_submissions,
+            "give_feedback": is_agenda_submission_visible & is_feedback_ready,
+            "is_speaker": is_speaker,
+            "add_speaker": can_be_edited & can_request_speakers,
+        }
+
     class urls(EventUrls):
         user_base = "{self.event.urls.user_submissions}{self.code}/"
         withdraw = "{user_base}withdraw"
@@ -304,13 +393,17 @@ class Submission(GenerateCode, PretalxModel):
 
     @cached_property
     def editable(self):
+        if self.state == SubmissionStates.DRAFT:
+            return self.cfp_open
+
+        if not self.event.get_feature_flag("speakers_can_edit_submissions"):
+            return False
+
         if self.state == SubmissionStates.SUBMITTED:
             return self.cfp_open or (
                 self.event.active_review_phase
                 and self.event.active_review_phase.speakers_can_change_submissions
             )
-        if self.state == SubmissionStates.DRAFT:
-            return self.cfp_open
         return self.state in SubmissionStates.accepted_states
 
     @property
@@ -324,18 +417,18 @@ class Submission(GenerateCode, PretalxModel):
         return result
 
     @property
-    def is_anonymised(self):
+    def is_anonymised(self) -> bool:
         if self.anonymised:
-            return self.anonymised.get("_anonymised", False)
+            return bool(self.anonymised.get("_anonymised", False))
         return False
 
-    @property
+    @cached_property
     def reviewer_answers(self):
         return self.answers.filter(question__is_visible_to_reviewers=True).order_by(
             "question__position"
         )
 
-    @property
+    @cached_property
     def public_answers(self):
         from pretalx.submission.models.question import QuestionTarget
 
@@ -817,8 +910,6 @@ class Submission(GenerateCode, PretalxModel):
 
         :class:`~pretalx.schedule.models.schedule.Schedule`.
         """
-        from pretalx.agenda.permissions import is_agenda_visible
-
         if not is_agenda_visible(None, self.event):
             return []
         return self.current_slots
@@ -848,14 +939,14 @@ class Submission(GenerateCode, PretalxModel):
         return False
 
     @cached_property
-    def median_score(self):
+    def median_score(self) -> float | None:
         scores = [
             review.score for review in self.reviews.all() if review.score is not None
         ]
         return statistics.median(scores) if scores else None
 
     @cached_property
-    def mean_score(self):
+    def mean_score(self) -> float | None:
         scores = [
             review.score for review in self.reviews.all() if review.score is not None
         ]
@@ -1005,6 +1096,20 @@ class Submission(GenerateCode, PretalxModel):
         )
         return speaker
 
+    def remove_speaker(self, speaker, orga=True, user=None):
+        if self.speakers.filter(code=speaker.code).exists():
+            self.speakers.remove(speaker)
+            self.log_action(
+                "pretalx.submission.speakers.remove",
+                person=user or speaker,
+                orga=orga,
+                data={
+                    "code": speaker.code,
+                    "email": speaker.email,
+                    "name": speaker.name,
+                },
+            )
+
     def send_invite(self, to, _from=None, subject=None, text=None):
         from pretalx.mail.models import QueuedMail
 
@@ -1014,7 +1119,7 @@ class Submission(GenerateCode, PretalxModel):
         subject = subject or phrases.cfp.invite_subject.format(
             speaker=_from.get_display_name()
         )
-        subject = f"[{self.event.slug}] {subject}"
+        subject = get_prefixed_subject(self.event, subject)
         text = text or phrases.cfp.invite_text.format(
             event=self.event.name,
             title=self.title,

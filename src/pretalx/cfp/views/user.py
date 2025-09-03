@@ -1,7 +1,6 @@
 import textwrap
 import urllib
 
-from csp.decorators import csp_update
 from django.contrib import messages
 from django.contrib.auth import logout
 from django.core.exceptions import ValidationError
@@ -22,22 +21,22 @@ from django.views.generic import (
     View,
 )
 from django_context_decorator import context
-from rest_framework.authtoken.models import Token
 
 from pretalx.cfp.forms.submissions import SubmissionInvitationForm
 from pretalx.cfp.views.event import LoggedInEventPageMixin
 from pretalx.common.forms.fields import SizeFileInput
+from pretalx.common.image import gravatar_csp
 from pretalx.common.middleware.event import get_login_redirect
 from pretalx.common.text.phrases import phrases
 from pretalx.common.views import is_form_bound
 from pretalx.person.forms import LoginInfoForm, SpeakerProfileForm
-from pretalx.person.permissions import person_can_view_information
+from pretalx.person.rules import can_view_information
 from pretalx.schedule.forms import AvailabilitiesFormMixin
 from pretalx.submission.forms import InfoForm, QuestionsForm, ResourceForm
 from pretalx.submission.models import Resource, Submission, SubmissionStates
 
 
-@method_decorator(csp_update(IMG_SRC="https://www.gravatar.com"), name="dispatch")
+@method_decorator(gravatar_csp(), name="dispatch")
 class ProfileView(LoggedInEventPageMixin, TemplateView):
     template_name = "cfp/event/user_profile.html"
 
@@ -49,11 +48,9 @@ class ProfileView(LoggedInEventPageMixin, TemplateView):
             data=self.request.POST if is_form_bound(self.request, "login") else None,
         )
 
-    @context
-    def token(self):
-        return Token.objects.filter(
-            user=self.request.user
-        ).first() or Token.objects.create(user=self.request.user)
+    @cached_property
+    def can_edit_profile(self):
+        return self.request.event.get_feature_flag("speakers_can_edit_submissions")
 
     @context
     @cached_property
@@ -62,7 +59,7 @@ class ProfileView(LoggedInEventPageMixin, TemplateView):
         return SpeakerProfileForm(
             user=self.request.user,
             event=self.request.event,
-            read_only=False,
+            read_only=not self.can_edit_profile,
             with_email=False,
             field_configuration=self.request.event.cfp_flow.config.get(
                 "profile", {}
@@ -79,6 +76,7 @@ class ProfileView(LoggedInEventPageMixin, TemplateView):
             data=self.request.POST if bind else None,
             files=self.request.FILES if bind else None,
             speaker=self.request.user,
+            readonly=not self.can_edit_profile,
             event=self.request.event,
             target="speaker",
         )
@@ -88,11 +86,7 @@ class ProfileView(LoggedInEventPageMixin, TemplateView):
         return self.request.event.questions.filter(target="speaker").exists()
 
     def post(self, request, *args, **kwargs):
-        if request.POST.get("form") == "token":
-            request.user.regenerate_token()
-            messages.success(request, phrases.cfp.token_regenerated)
-            return super().get(request, *args, **kwargs)
-        elif self.login_form.is_bound and self.login_form.is_valid():
+        if self.login_form.is_bound and self.login_form.is_valid():
             self.login_form.save()
             request.user.log_action("pretalx.user.password.update")
         elif self.profile_form.is_bound and self.profile_form.is_valid():
@@ -108,7 +102,6 @@ class ProfileView(LoggedInEventPageMixin, TemplateView):
             if self.questions_form.has_changed():
                 self.request.event.cache.set("rebuild_schedule_export", True, None)
         else:
-            messages.error(self.request, phrases.base.error_saving_changes)
             return super().get(request, *args, **kwargs)
 
         messages.success(self.request, phrases.base.saved)
@@ -116,11 +109,11 @@ class ProfileView(LoggedInEventPageMixin, TemplateView):
 
 
 class SubmissionViewMixin:
-    permission_required = "submission.edit_submission"
+    permission_required = "submission.update_submission"
 
     def has_permission(self):
         return super().has_permission() or self.request.user.has_perm(
-            "orga.view_submissions", self.request.event
+            "submission.orga_list_submission", self.request.event
         )
 
     def dispatch(self, request, *args, **kwargs):
@@ -159,7 +152,7 @@ class SubmissionsListView(LoggedInEventPageMixin, ListView):
         return [
             info
             for info in self.request.event.information.all()
-            if person_can_view_information(self.request.user, info)
+            if can_view_information(self.request.user, info)
         ]
 
     @context
@@ -178,7 +171,7 @@ class SubmissionsWithdrawView(LoggedInEventPageMixin, SubmissionViewMixin, Detai
     template_name = "cfp/event/user_submission_withdraw.html"
     model = Submission
     context_object_name = "submission"
-    permission_required = "submission.perform_actions"
+    permission_required = "submission.is_speaker_submission"
 
     def get_permission_object(self):
         return self.get_object()
@@ -231,7 +224,9 @@ class SubmissionConfirmView(LoggedInEventPageMixin, SubmissionViewMixin, FormVie
     def dispatch(self, request, *args, **kwargs):
         if request.user.is_anonymous:
             return get_login_redirect(request)
-        if not request.user.has_perm("submission.perform_actions", self.submission):
+        if not request.user.has_perm(
+            "submission.is_speaker_submission", self.submission
+        ):
             self.template_name = "cfp/event/user_submission_confirm_error.html"
         return super().dispatch(request, *args, **kwargs)
 
@@ -293,7 +288,7 @@ class SubmissionsEditView(LoggedInEventPageMixin, SubmissionViewMixin, UpdateVie
     form_class = InfoForm
     context_object_name = "submission"
     permission_required = "submission.view_submission"
-    write_permission_required = "submission.edit_submission"
+    write_permission_required = "submission.update_submission"
 
     def get_permission_object(self):
         return self.object
@@ -456,7 +451,7 @@ class DeleteAccountView(LoggedInEventPageMixin, View):
 class SubmissionInviteView(LoggedInEventPageMixin, SubmissionViewMixin, FormView):
     form_class = SubmissionInvitationForm
     template_name = "cfp/event/user_submission_invitation.html"
-    permission_required = "cfp.add_speakers"
+    permission_required = "submission.add_speaker_submission"
 
     def get_permission_object(self):
         return self.get_object()
@@ -502,7 +497,9 @@ class SubmissionInviteAcceptView(LoggedInEventPageMixin, DetailView):
     @context
     @cached_property
     def can_accept_invite(self):
-        return self.request.user.has_perm("cfp.add_speakers", self.get_object())
+        return self.request.user.has_perm(
+            "submission.add_speaker_submission", self.get_object()
+        )
 
     def post(self, request, *args, **kwargs):
         if not self.can_accept_invite:
