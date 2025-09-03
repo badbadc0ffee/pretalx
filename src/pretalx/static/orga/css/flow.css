@@ -75,7 +75,7 @@
                 3px 3px 5px rgb(0 0 0 / 0.18),
                 3px 1px 4px rgb(0 0 0 / 0.3);
               border: var(--color-danger) 4px solid;
-              background-color: white;
+              background-color: var(--color-white);
             }
           }
         }
@@ -86,7 +86,7 @@
 #dirty-flow {
   z-index: 400;
   position: fixed;
-  background-color: white;
+  background-color: var(--color-white);
   margin-bottom: 0;
   bottom: 1px;
   left: 250px;

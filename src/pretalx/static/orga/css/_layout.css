@@ -788,7 +788,7 @@ details.submission-state-dropdown {
 
   summary {
     color: var(--submission-color-primary);
-    background-color: white;
+    background-color: var(--color-white);
     padding: 0.5rem;
     h4 {
       font-size: 0.875rem;
@@ -1124,7 +1124,7 @@ table .color-square {
         &:before {
           font-family: ForkAwesome;
           font-weight: bold;
-          color: rgb(0 0 0 / 0.3);
+          color: var(--color-grey-light);
           text-align: center;
           position: absolute;
         }
@@ -1230,7 +1230,7 @@ table .color-square {
     padding: 0;
     margin: 0;
     border: none;
-    --anon-color: rgb(0 0 0 / 0.72);
+    --anon-color: var(--color-grey-dark);
     background-color: var(--anon-color);
     color: white;
     padding: 8px 16px;
