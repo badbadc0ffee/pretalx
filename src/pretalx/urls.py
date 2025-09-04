@@ -24,6 +24,8 @@ urlpatterns = [
     path("403", error_view(403)),
     path("403/csrf", error_view(4031)),
     path("404", error_view(404)),
+    path("418", error_view(418)),
+    path("425", error_view(425)),
     path("500", error_view(500)),
     path("orga/", include("pretalx.orga.urls", namespace="orga")),
     path("api/", include("pretalx.api.urls", namespace="api")),
