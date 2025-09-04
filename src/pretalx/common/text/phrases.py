@@ -89,7 +89,51 @@ class BasePhrases(Phrases, app="base"):
         _("This page has ceased to be."),
         _("Huh."),
     ]
-
+    teapot = _("I'm a teapot!")
+    teapot_long = [
+        _("I'm a little teapot.<br/>Short and stout,"),
+        _("Here is my handle<br/>Here is my spout"),
+        _("When I get all steamed up,<br/>Hear me shout,"),
+        _("Tip me over and pour me out!"),
+    ]
+    too_early = _("Too early.")
+    too_early_long = [
+        _("Patience, traveler. The gates haven't opened yet."),
+        _("You're early! That's... kind of impressive."),
+        _("The future looks great, but it's not quite ready."),
+        _("We love your enthusiasm — come back a little later."),
+        _("You're ahead of schedule. Coffee, maybe?"),
+        _("Not much to see here — yet. Stay tuned!"),
+        _("Almost there... but not quite. Hang tight."),
+        _("Oops! You're too soon for the party."),
+        _("The early bird gets... this error page."),
+        _("Wow, someone's eager. Chill — it's not time yet."),
+        _("You're early. Like, way too early. Go touch some grass."),
+        _("Nice try, keener. Come back when the rest of us are ready."),
+        _("Congrats, you broke the space-time continuum."),
+        _("This page isn't baked yet. Put it back in the oven."),
+        _("The fun starts later. You're just... prematurely curious."),
+        _("You must really hate waiting, huh?"),
+        _("Did you time travel? Because this definitely isn't live yet."),
+        _("Too early. Not even the devs are awake."),
+        _("Caught you peeking. Naughty."),
+        _("Temporal protocols violated. Please return to your assigned timeline."),
+        _("The chickens haven't voted yet. We must wait."),
+        _("Loading future... 13%... 13%... 13%... (this might take a while)"),
+        _("Our time gnomes are still sharpening their clocks."),
+        _("The quantum muffins aren't done rising."),
+        _("You've reached the internet's pre-heating phase."),
+        _("Reality is buffering. Please insert more ducks."),
+        _("We asked the future. It said: 'nope.'"),
+        _("This page only exists tomorrow. Sorry, time traveler."),
+        _("The secret council of space otters has not yet convened."),
+        _("The stars are not aligned for this page yet."),
+        _("You've entered the time vortex. Please return to the present."),
+        _("The universe is still deciding if this page should exist."),
+        _("You've reached the 'before' stage of this page's life."),
+        _("This page is still in beta. Like, way in beta."),
+        _("The time lords are still debating its existence."),
+    ]
     enter_email = _("Email address")
     new_password = _("New password")
     password_repeat = _("New password (again)")
