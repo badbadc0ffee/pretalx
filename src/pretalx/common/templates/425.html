@@ -1,0 +1,17 @@
+{% extends "common/error.html" %}
+
+{% load i18n %}
+{% load static %}
+
+{% block title %}{{ phrases.base.too_early }}{% endblock title %}
+{% block error_image %}
+    <img loading="lazy" src="{% static "common/img/error_425.svg" %}" class="img" alt="{{ phrases.base.too_early }}">
+{% endblock error_image %}
+{% block error_message %}
+    {{ phrases.base.too_early }}
+    </h2>
+    <h5>
+        <p class="ml-auto mr-auto text-center">{{ phrases.base.too_early_long|safe }}</p>
+    </h5>
+{% endblock error_message %}
+{% block error_code %}425{% endblock error_code %}
