@@ -958,8 +958,11 @@ msgid "Resources"
 msgstr "Ressourcen"
 
 #: pretalx/cfp/templates/cfp/includes/submission_resources_form.html:13
-msgid "Resources will be publicly visible."
-msgstr "Ressourcen werden öffentlich einsehbar sein."
+msgid "Resources will be publicly visible unless marked as non-public."
+msgstr "Ressourcen werden öffentlich einsehbar sein, sofern sie nicht als privat markiert sind."
+
+msgid "Publicly visible resource"
+msgstr "Öffentlich einsehbare Resource"
 
 #: pretalx/cfp/templates/cfp/includes/submission_resources_form.html:62
 msgid "This proposal has no resources yet."
