@@ -329,6 +329,13 @@ class TalkSlotViewSet(
 
         return queryset
 
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        if not self.event:
+            return context
+        context["public_resources"] = not self.is_orga
+        return context
+
     @action(detail=True, methods=["get"])
     def ical(self, request, event, pk=None):
         """Export a single talk slot as an iCalendar file."""
