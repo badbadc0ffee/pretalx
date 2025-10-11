@@ -569,7 +569,7 @@ class OrgaTableMixin(SingleTableMixin):
         )
         if self.request.GET.get("page_size"):
             try:
-                max_page_size = getattr(self, "max_page_size", 250)
+                max_page_size = getattr(self, "max_page_size", 1000)
                 size = min(max_page_size, int(self.request.GET.get("page_size")))
                 self.request.session[skey] = size
                 return size
