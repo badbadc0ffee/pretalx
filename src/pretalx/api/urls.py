@@ -8,6 +8,7 @@ from rest_framework import routers
 from pretalx.api.views import (
     access_code,
     event,
+    export,
     mail,
     question,
     review,
@@ -98,4 +99,9 @@ urlpatterns = [
     path("upload/", upload.UploadView.as_view(), name="upload"),
     path("events/<slug:event>/", include(event_router.urls)),
     path("organisers/<slug:organiser>/", include(organiser_router.urls)),
+    path(
+        "events/<slug:event>/schedule/export/<str:exporter>",
+        export.ExporterProxyView.as_view(),
+        name="exporter",
+    ),
 ]
