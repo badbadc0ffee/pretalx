@@ -6,6 +6,7 @@
 Release Notes
 =============
 
+- :feature:`orga` When creating a new API token, you can now select and deselect whole rows and columns.
 - :feature:`orga` You can now see which endpoints an existing API token can access.
 - :feature:`api` There is now an API for session feedback.
 - :release:`2025.2.2 <2025-12-05>`
