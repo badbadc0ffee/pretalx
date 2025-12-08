@@ -6,6 +6,7 @@
 Release Notes
 =============
 
+- :feature:`api` The submission organiser API now includes the ``created`` and ``updated`` timestamp fields. Please note that the ``updated`` timestamp is not guaranteed to be always set, particularly when only custom fields are being changes. If you need a reliable last modification date, please refer to the object changelog instead.
 - :feature:`orga` When creating a new API token, you can now select and deselect whole rows and columns.
 - :feature:`orga` You can now see which endpoints an existing API token can access.
 - :feature:`api` There is now an API for session feedback.
