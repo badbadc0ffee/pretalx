@@ -5,12 +5,13 @@ from contextlib import nullcontext
 
 from django.conf import settings
 from django.core.exceptions import PermissionDenied, SuspiciousOperation
-from django.http import Http404, HttpResponseServerError
+from django.http import Http404, HttpResponse, HttpResponseServerError
 from django.template import TemplateDoesNotExist, loader
 from django.views import csrf, defaults
 from django_scopes import scope
 
 from pretalx.common.language import language
+from pretalx.common.text.phrases import phrases
 
 ERROR_500_TEMPLATE_NAME = "500.html"
 
@@ -71,11 +72,21 @@ def handle_csrf_failure(request, reason=""):
     return _render_in_event_context(request, lambda: csrf.csrf_failure(request, reason))
 
 
+def handle_4xx(code, request):
+    template = loader.get_template(f"{code}.html")
+    context = {"phrases": phrases}
+    class Response(HttpResponse):
+        status_code = code
+    return Response(template.render(context))
+
+
 def error_view(status_code):
     # The /400, /403, /404, /500 URLs exist so that the error pages can be
     # previewed and tested.
     if status_code == 4031:
         return handle_csrf_failure
+    if status_code in [418, 425]:
+        return lambda request: handle_4xx(status_code, request)
     if status_code == 500:
         return handle_500
     handlers = {
