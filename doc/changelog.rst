@@ -9,6 +9,105 @@ Release Notes
 The following changes will be part of the upcoming pretalx release.
 For already released changes, head over here:
 
+- :bug:`orga` Copying an event's settings when creating a new event did not copy email signatures, attendee signup settings, or tags.
+- :feature:`dev,2758` A plugin handling ``queuedmail_pre_send`` asynchronously can now prevent a mail from being sent via SMTP by setting ``mail.state`` to ``SENDING``.
+- :bug:`orga:schedule` Changing a session's state, for example cancelling a scheduled session, did not update the "unreleased changes" marker in the schedule navigation.
+- :feature:`api` Requests to API URLs that lead to an error now all return JSON errors instead of full HTML pages.
+- :bug:`api` Expanding ``submission.speakers`` on the talk slot endpoint returned the speakers of a session in arbitrary order instead of the order set on the session.
+- :bug:`api` Listing answers with an expanded ``question.tracks`` field returned a server error.
+- :feature:`api` Authenticated API requests are now rate limited.
+- :feature:`orga` Track and tag colours now show up wherever tracks or tags are named in the organiser area, including the review page, the tag assignment page and the review team assignment page.
+- :feature:`orga:submission` Changing the state of a session now happens in a dialog, instead of taking you to a separate page and back.
+- :bug:`admin` The update notification bell in the organiser navigation kept showing after update checks were turned off.
+- :bug:`orga:review` The review settings accepted two scores with the same value in one category, which made the resulting reviews impossible to tell apart.
+- :feature:`orga:email` Emails sending out an access code were not shown in the list of sent emails to prevent leaking access codes among organisers. After talking to several pretalx users, we decided that this was of very little concern and instead are now saving the emails, so they show up in the list of sent emails, including on speaker pages.
+- :bug:`admin` The Content Security Policy blocked fonts embedded as data URIs, like the icon fonts shipped by vendored libraries. If you allowed a font host through the ``csp`` setting, move that value to the new ``csp_font`` setting.
+- :feature:`orga` Confirmation prompts, like the ones for deleting a session or retracting an invitation, now open in a dialog instead of taking you to a separate page.
+- :feature:`orga` The event history now records and shows event settings changes.
+- :feature:`-` Forms that cannot be saved show better errors now, and link directly to the fields with errors, even when they are in a different tab.
+- :bug:`orga` History and activity pages showed a speaker's account name instead of the name they use for this event, which could be confusing for organisers.
+- :bug:`orga` Paginated lists and API endpoints could repeat or drop entries between pages when several rows sorted equally, for example emails sent in the same batch, or history entries written at the same moment.
+- :announcement:`admin` pretalx now requires SQLite 3.37 or newer.
+- :announcement:`dev` pretalx now runs on Django 6.1. Plugins that send email should move from ``EMAIL_*`` settings and ``get_connection()`` to the new ``MAILERS`` setting and ``mail.mailers``, both of which Django will remove in 7.0.
+- :feature:`orga` After 24 hours without activity, pretalx asks organisers for the password again, and after seven days, organisers have to log in again.
+- :bug:`orga` The Markdown editor buttons did not work in the CfP editor dialogs.
+- :feature:`schedule` The featured sessions page got an overhaul, and organisers can now configure the text shown at the top.
+- :bug:`orga` Editing a custom field changed its internal identifier every time, breaking data exports and integrations that relied on it.
+- :bug:`cfp` The CfP was advertised as open even when all options for a mandatory field (session type or track) required an access code, so nobody could actually submit. It now shows as closed to everybody without an access code, and organisers are warned on their dashboard.
+- :bug:`orga:schedule` The schedule editor could fail to save a session with a server error when its room had been created after the editor was opened.
+- :feature:`orga` You can sort tables by more than just two columns now.
+- :feature:`orga:submission,1618` The session list can show a new column with the number of resources per session, which also allows sorting by it, so you can find sessions with no resources yet.
+- :feature:`orga` Pages that showed an object’s history in a narrow sidebar now offer it as a separate tab, making it easier to read. More pages gained a history tab, for example email templates.
+- :feature:`schedule` The public schedule and the schedule widget can now be filtered by room, like they can by track or language.
+- :feature:`schedule` Speakers without a profile picture now show their initials on the public agenda, matching the organiser area, instead of a generic outline drawing.
+- :bug:`schedule` The widget script was served without any cache headers, so browsers re-downloaded it on every page view.
+- :feature:`-` pretalx now verifies that users own their account email address. New accounts receive a verification link and are redirected to a verification page. Server administrators can intervene and change account status. Existing users are marked as unverified-but-legacy and do not have to undergo verification.
+- :bug:`orga` The event history page failed to load when it contained entries about objects from a plugin that has since been uninstalled.
+- :feature:`cfp` When an access code limits a proposal to a single track or session type, speakers now see which one they are submitting to, instead of a hidden field.
+- :feature:`orga` Organiser lists have a new filter bar: search, more filters than before (including by custom fields), and removable filter pills.
+- :feature:`orga` The organiser area got a visual refresh, which includes a more powerful event search and command palette.
+- :bug:`schedule` Session pages offered attendees a sign-up button for sessions that were already over.
+- :feature:`schedule` Public session pages, including the version in the embedded widget, have a new, cleaner layout, and now include information about the previous and next session, as well as sessions running in parallel.
+- :bug:`schedule` Deactivating a public custom field left its existing answers on public session and speaker pages.
+- :bug:`api` Creating an answer via the API returned a response body without the answer’s ID.
+- :bug:`api` API tokens never recorded their last usage date.
+- :feature:`orga:speaker` Speakers no longer need a user account. Organisers can add “managed” speakers with just a name and optionally an email address. Managed speakers can be invited to claim their profile and manage it themselves, turning into regular speakers.
+- :announcement:`dev` With the introduction of managed speakers, ``SpeakerProfile.user`` can now be ``None``. Make sure your code does not assume that speakers have user accounts. Use fallback values like ``profile.effective_email`` where possible.
+- :feature:`orga` Paginated lists now offer links to the first and last page, and clicking the page indicator lets you jump straight to a page number.
+- :bug:`admin,2641` The system information page in the administrator area always claimed that no redis server had been configured.
+- :bug:`admin` The user detail page in the administrator area broke when a user had changed an API token, and did not show what was changed. Administrators can now view the detailed changes of history entries that do not belong to an event, which was previously not possible and the cause of this bug.
+- :bug:`api` The API file upload endpoint now rejects files that exceed the configured upload size limit, like the web interface does, instead of accepting uploads of any size.
+- :feature:`orga:schedule` Rooms that were used in past schedule versions can now be hidden if they are not needed anymore. Hiding a room will remove it from the schedule editor and from common filter fields. Rooms with no sessions were never shown in the public schedule.
+- :bug:`orga` When saving a form fails, forms with tabs (like the email editor or the event settings) now open the tab containing the invalid field and scroll to it, instead of leaving the error out of sight on a different tab.
+- :bug:`-` Forms with a required dropdown, like a proposal form asking for a track, could refuse to submit without showing any reason for it, and did not announce the dropdown as required to screen readers.
+- :bug:`orga` When a session expired while an organiser page was waiting on a background task, the page kept spinning forever instead of taking you to the login page.
+- :feature:`-` Controls that expand or collapse a section, like the navigation sidebar submenus or the email log entries, can now be operated with a keyboard, and are now announced correctly by screen readers.
+- :feature:`schedule` Session times now name the event timezone in visible text, rather than only in a tooltip that was unreachable without a mouse.
+- :feature:`orga` The collapsed navigation sidebar now shows the notification markers for unsent emails and unreleased schedule changes.
+- :bug:`orga` Multilingual input fields showed the wrong flag for a number of languages, and no flag at all for others.
+- :feature:`orga` Custom fields can no longer be switched between speaker fields and session fields after creation, as that used to leave responses inaccessible.
+- :bug:`orga:schedule` In the schedule editor, dragging a session could drop it in the wrong room, or refuse the drop entirely, after changing the grid size, e.g. by resizing the browser window or after switching to the condensed view.
+- :feature:`orga:email` The email preview now shows which parts of the text come from a placeholder.
+- :bug:`schedule` The public schedule changelog page and the schedule feed were very slow on events with many released schedule versions.
+- :bug:`-` Some help texts and labels were always shown in English.
+- :bug:`-` In right-to-left languages, the preview of Markdown text fields showed the text left-to-right, even though the input field itself was correctly right-to-left.
+- :feature:`cfp` Custom fields of the “choose one” type with four or more options are shown as a dropdown, which preselected its first option, inviting accidental choices. Custom field dropdowns are now initially left blank.
+- :bug:`lang` In right-to-left languages, the preview of Markdown text fields showed the text left-to-right, even though the input field itself was correctly right-to-left.
+- :bug:`schedule` Long room names in the schedule grid stretched the grid instead of being cut off. They are now shortened with an ellipsis, and show the full name as a tooltip.
+- :bug:`schedule` Long session titles and speaker lists could overflow their session in the schedule grid. They are now limited to a couple of lines, and expand when you hover them.
+- :feature:`orga:email` Placeholders can now be inserted by clicking them in the email template editor, like you already could in the email composer.
+- :feature:`cfp` Multiple choice custom fields can now be configured with a minimum and maximum number of options that may be selected.
+- :announcement:`api` The legacy API has been removed. API tokens created before pretalx v2025.1.0 that still use it will receive a ``400`` response until they are upgraded to API v1 or v2 in the token list at ``/orga/me``. The ``limit`` and ``offset`` pagination parameters that the legacy API used have been removed along with it – use ``page`` and ``page_size`` instead.
+- :feature:`-` To improve accessibility, links in running text are now underlined, so they no longer rely on colour alone to be recognisable.
+- :bug:`orga:schedule` Data exporters that only work on a released schedule were offered before the schedule was released, and then produced empty files. They are now greyed out in the organiser area until the schedule is released.
+- :announcement:`dev` Exporters are now created with the schedule they are meant to export, both when they are rendered and when they are only listed, so that checks like ``is_public`` can take the schedule into account. If you provide or use schedule exporters, please change your call signature to passing and expecting the schedule rather than the event.
+- :feature:`schedule` The schedule's timezone selector now offers all timezones instead of only the event timezone and the visitor's own one, with those two pinned to the top of the list. It is still hidden for visitors who are in the event timezone (or to be precise: whose timezone behaves the same as the event timezone for the duration fo the event).
+- :announcement:`dev` ``QueuedMail.send``, deprecated in v2026.2.0, has been removed. Plugins have to use ``send_draft`` or ``send_transient`` from ``pretalx.mail.domain.send`` instead. The compatibility shim for the old ``pretalx.common.send_mail`` Celery task has been removed along with it.
+- :bug:`orga` On the event dashboard, the “Active reviewers” tile never linked to the team management page, even for organisers with permission to change event settings.
+- :announcement:`dev` The legacy ``orga.change_settings`` permission alias, deprecated since v2025.1.0, has been removed. Plugins that still check it have to use ``event.update_event`` instead.
+- :announcement:`dev` The ``html_signal`` template tag and the ``html_head`` signals no longer mark all signal responses as safe HTML. Responses are now escaped unless a plugin explicitly marks them as safe, for example by using ``format_html`` or by rendering a template. If your plugin returns HTML as plain strings in response to these signals, please update them to return a string that is marked as safe.
+- :bug:`orga:submission` When creating a session in the organiser area with a speaker, if the creation step failed due to form validation, the selected speaker email disappeared from the speaker field and had to be entered again.
+- :security:`dev` The ``html_signal`` template tag and the ``html_head`` signals no longer mark all signal responses as safe HTML. Responses are now escaped unless a plugin explicitly marks them as safe, for example by using ``format_html`` or by rendering a template. If your plugin returns HTML as plain strings in response to these signals, please update them to return a string that is marked as safe.
+- :feature:`cfp` Proposal titles can now be up to 1000 characters long instead of 200. If you want to keep titles short, you can configure a maximum title length in the CfP editor.
+- :bug:`cfp` Fields that failed validation lost their accessibility error marker in some cases, so screen readers no longer announced them as invalid.
+- :feature:`cfp` If fields are limited to a set number of words rather than characters, pretalx now shows the same kind of progress indicator and highlights for content beyond the configured maximum length.
+- :bug:`cfp` The frontend word length validation ignored minimum lengths and differed in its count from the actual server-level validation (e.g. by counting leading and trailing whitespace and counting e.g. "state-of-the-art" as four words instead of one).
+- :feature:`-` Error pages, like the “page not found” page, are now rendered in the user's preferred language if possible instead of the default language.
+- :feature:`orga:submission` The session list in the organiser area now starts out filtered to submitted, accepted and confirmed sessions, hiding rejected, cancelled and withdrawn ones.
+- :bug:`cfp` In Markdown fields, pasting a URL while text was selected always wrapped the selection as a new link, even if this nested one link inside another, breaking the rendered Markdown. If the selected text is already inside a Markdown link format, the URL is now pasted as-is.
+- :feature:`schedule,2583` The session and speaker popups in the schedule and the embedded widget now show all of the information available on the session and speaker pages: whether a session is not going to be recorded, session images, all scheduled time slots of a session (rather than just the currently selected one), room descriptions, and calendar export links for sessions and speakers.
+- :bug:`orga:schedule` In the schedule editor, copying a break to other rooms while also changing its duration did the copying first, and then the duration change, resulting in inconsistent durations between the original and the copies.
+- :bug:`schedule,2583` The session and speaker popups in the schedule (and the embedded widget) did not show all custom fields: long-text fields were always omitted, and file answers linked to the wrong address.
+- :bug:`schedule,2585` When the viewer's local timezone differed from the timezone the schedule was displayed in, some sessions in the schedule grid were shown as starting at the beginning of the day and lasting for hours.
+- :bug:`schedule,2573` Users who were reviewers for an event could in some cases not save schedule favourites or sign up for sessions.
+- :bug:`schedule,2588` Calendar exports (.ics files) labelled their timezone with an abbreviation (like GMT or PST) rather than the full timezone name, which led some calendar applications, particularly on macOS, to import sessions as taking place at the wrong time.
+- :bug:`schedule,2568` On touch devices, the favourites filter (and some other buttons) kept their highlighted hover look after being tapped.
+- :bug:`schedule,2569` Public pages could grow wider than the screen on mobile devices, as tooltips (like the room description on session pages) took up space even while hidden.
+- :feature:`admin` pretalx now checks that your Python and PostgreSQL versions are supported, both in ``check --deploy`` and when running migrations.
+- :bug:`orga:speaker,2565` Sorting the organiser-wide speaker list by a column resulted in a server error.
+- :bug:`orga:submission` Anonymising a session did not work when the attendee signup feature was enabled.
+- :feature:`admin` The update check page now shows a status badge for every row, so it is easier to see which parts of your installation have updates available.
+- :bug:`orga:email` Clicking the "Send all on this page" button in the outbox did not work and showed a server error instead of sending the emails.
 - :release:`2026.2.1 <2026-07-08>` Bugfix release for pretalx 2026.2. See the `release blog post <https://pretalx.com/p/news/releasing-pretalx-2026-2-0/>`_.
 - :release:`2026.2.0 <2026-07-08>` See the `release blog post <https://pretalx.com/p/news/releasing-pretalx-2026-2-0/>`_.
 - :bug:`orga:schedule` Dates and times in the schedule editor now follow the organiser's language again, matching the public schedule, instead of falling back to English formatting (with a 12-hour am/pm clock) in other languages.
