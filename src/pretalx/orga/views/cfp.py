@@ -803,10 +803,10 @@ class CfPEditorMixin:
 
     def _get_preview_form(self, step):
         if step.identifier == "info":
-            return InfoForm(event=self.request.event, read_only=True)
+            return InfoForm(event=self.request.event, read_only=True, is_orga=True)
         if step.identifier == "profile":
             return SpeakerProfileForm(
-                event=self.request.event, user=None, read_only=True
+                event=self.request.event, user=None, read_only=True, is_orga=True
             )
         return None
 
@@ -872,6 +872,7 @@ class CfPEditorMixin:
             "form_field": form_field,
             "auto_hidden_reason": auto_hidden_reason,
             "is_auto_required": is_auto_required,
+            "is_hidden": field_settings.get("hidden", False),
         }
 
     def _get_available_fields(self, step):
@@ -1060,7 +1061,7 @@ class CfPEditorFieldToggle(CfPEditorMixin, EventPermissionRequired, View):
         if not field_key:
             return JsonResponse({"error": "No field provided"}, status=400)
 
-        if action not in ("add", "remove"):
+        if action not in ("add", "remove", "hide", "unhide"):
             return JsonResponse({"error": "Invalid action"}, status=400)
 
         if field_key.startswith("question_"):
@@ -1078,9 +1079,12 @@ class CfPEditorFieldToggle(CfPEditorMixin, EventPermissionRequired, View):
             if field_key not in cfp.fields:
                 cfp.fields[field_key] = default_fields().get(field_key, {}).copy()
 
-            cfp.fields[field_key]["visibility"] = (
-                "optional" if action == "add" else "do_not_ask"
-            )
+            if action in ("add", "remove"):
+                cfp.fields[field_key]["visibility"] = (
+                    "optional" if action == "add" else "do_not_ask"
+                )
+            elif action in ("hide", "unhide"):
+                cfp.fields[field_key]["hidden"] = action == "hide"
             cfp.save()
 
         ctx = self.get_step_context(step_id)

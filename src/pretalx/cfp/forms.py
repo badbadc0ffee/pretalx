@@ -74,15 +74,16 @@ class RequestRequire:
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        is_orga = getattr(self, "is_orga", False)
         count_chars = self.event.cfp.settings["count_length_in"] == "chars"
         for key in self.Meta.request_require:
-            visibility = self.event.cfp.fields.get(key, default_fields()[key])[
-                "visibility"
-            ]
-            if visibility == "do_not_ask":
+            config = self.event.cfp.fields.get(key, default_fields()[key])
+            visibility = config["visibility"]
+            hidden = config.get("hidden", False)
+            if visibility == "do_not_ask" or (hidden and not is_orga):
                 self.fields.pop(key, None)
             elif field := self.fields.get(key):
-                field.required = visibility == "required"
+                field.required = visibility == "required" and not hidden
                 min_value = self.event.cfp.fields.get(key, {}).get("min_length")
                 max_value = self.event.cfp.fields.get(key, {}).get("max_length")
                 if min_value or max_value:
