@@ -155,11 +155,13 @@
         display: none;
     }
 }
-.field-preview .field-remove {
+.field-preview .field-remove,
+.field-preview .field-hide-toggle {
     opacity: 0;
     transition: opacity 0.2s;
 }
-.field-preview:hover .field-remove {
+.field-preview:hover .field-remove,
+.field-preview:hover .field-hide-toggle {
     opacity: 1;
 }
 

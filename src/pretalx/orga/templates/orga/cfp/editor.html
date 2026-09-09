@@ -334,7 +334,7 @@ SPDX-License-Identifier: AGPL-3.0-only WITH LicenseRef-Pretalx-AGPL-3.0-Terms
     {# Unified field card partial for both regular fields and questions #}
     {# Required context: field (dict with key, label, etc.), step_id (string) #}
     <div
-        class="field-preview{% if field.auto_hidden_reason %} field-preview-auto-hidden{% endif %}"
+        class="field-preview{% if field.is_hidden or field.auto_hidden_reason %} field-preview-auto-hidden{% endif %}"
         dragsort-id="{{ field.key }}"
     >
         <div class="pt-1">
@@ -354,10 +354,14 @@ SPDX-License-Identifier: AGPL-3.0-only WITH LicenseRef-Pretalx-AGPL-3.0-Terms
                 hx-trigger="click"
                 data-dialog-target="#field-modal"
             >
-                {% if field.auto_hidden_reason %}
+                {% if field.is_hidden or field.auto_hidden_reason %}
                     <span class="field-auto-hidden-notice">
                         <i class="fa fa-eye-slash"></i> {% translate "Currently hidden" %}
-                        ({{ field.auto_hidden_reason }})
+                        {% if field.auto_hidden_reason %}
+                            ({{ field.auto_hidden_reason }})
+                        {% else %}
+                            ({% translate "only available to the orga team" %})
+                        {% endif %}
                     </span>
                 {% endif %}
                 <span class="field-preview-edit-hint">
@@ -407,6 +411,23 @@ SPDX-License-Identifier: AGPL-3.0-only WITH LicenseRef-Pretalx-AGPL-3.0-Terms
                 >
                     <i class="fa fa-times"></i>
                 </button>
+                {% if not field.is_question %}
+                    <button
+                        type="button"
+                        class="field-hide-toggle btn btn-link text-muted px-2"
+                        title="{% if field.is_hidden %}{% translate 'Show this field to submitters' %}{% else %}{% translate 'Hide this field from submitters' %}{% endif %}"
+                        {% if field.is_hidden %}
+                            hx-post="{% url 'orga:cfp.editor.field_toggle' event=request.event.slug step=step_id action='unhide' %}"
+                        {% else %}
+                            hx-post="{% url 'orga:cfp.editor.field_toggle' event=request.event.slug step=step_id action='hide' %}"
+                        {% endif %}
+                        hx-vals='{"field": "{{ field.key }}"}'
+                        hx-target="#step-content-inner"
+                        hx-swap="innerHTML"
+                    >
+                        <i class="fa fa-eye{% if not field.is_hidden %}-slash{% endif %}"></i>
+                    </button>
+                {% endif %}
             {% endif %}
         </div>
     </div>

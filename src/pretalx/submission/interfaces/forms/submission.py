@@ -60,8 +60,9 @@ class SubmissionInfoForm(CfPFormMixin, ReadOnlyFlag, RequestRequire, forms.Model
         widget=EnhancedSelectMultiple(color_field="color"),
     )
 
-    def __init__(self, event, **kwargs):
+    def __init__(self, event, is_orga=False, **kwargs):
         self.event = event
+        self.is_orga = is_orga
         self.access_code = kwargs.pop("access_code", None)
         self.default_values = {}
         instance = kwargs.get("instance")
@@ -315,6 +316,7 @@ class SubmissionOrgaForm(ReadOnlyFlag, RequestRequire, forms.ModelForm):
 
     def __init__(self, event, anonymise=False, **kwargs):
         self.event = event
+        self.is_orga = True
         initial_slot = {}
         instance = kwargs.get("instance")
         if instance and not instance._state.adding:
