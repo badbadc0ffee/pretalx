@@ -421,6 +421,16 @@ class AvailabilitiesField(CharField):
         if "initial" not in kwargs and self.instance and self.event:
             kwargs["initial"] = self._serialize(self.event, self.instance)
 
+        kwargs.setdefault("label", _("Availability"))
+        kwargs.setdefault(
+            "help_text",
+            _(
+                "Please click and drag to mark your availability during the conference with "
+                "green blocks. We will try to schedule your slot during these times. You can "
+                "click a block twice to remove it."
+            ),
+        )
+
         super().__init__(*args, **kwargs)
 
     def set_initial_from_instance(self):
