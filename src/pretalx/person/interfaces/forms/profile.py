@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only WITH LicenseRef-Pretalx-AGPL-3.0-Terms
 
 from django import forms
+from django.utils.translation import gettext_lazy as _
 
 from pretalx.cfp.forms import CfPFormMixin, RequestRequire
 from pretalx.common.forms.fields import AvailabilitiesField, ProfilePictureField
@@ -14,7 +15,7 @@ from pretalx.person.validators import validate_email_unique
 
 
 class SpeakerProfileForm(CfPFormMixin, ReadOnlyFlag, RequestRequire, forms.ModelForm):
-    availabilities = AvailabilitiesField()
+    availabilities = AvailabilitiesField(label=_("Availability"))
     avatar = ProfilePictureField()
 
     def __init__(
@@ -153,6 +154,7 @@ class SpeakerAvailabilityForm(forms.Form):
                 event=self.event,
                 instance=self.speaker,
                 required=self.event.cfp.require_availabilities,
+                label=_("Availability"),
             )
 
     def save(self):

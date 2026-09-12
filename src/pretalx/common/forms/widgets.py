@@ -474,6 +474,24 @@ class AvailabilitiesWidget(forms.TextInput):
         attrs = add_attribute(attrs, "class", "availabilities-editor-data")
         super().__init__(attrs=attrs)
 
+    def get_strings(self):
+        return {
+            "timezone": _("All times are in the event timezone, {tz}."),
+            "all_day": _("All day"),
+            "no_rooms": _("No rooms open"),
+            "show_full_day": _("Show all 24 hours"),
+            "marked": _("Marked as available"),
+            "stale": _("Marked as available (no rooms open)"),
+            "delete": phrases.base.delete_button,
+        }
+
+    def get_context(self, name, value, attrs):
+        context = super().get_context(name, value, attrs)
+        context["widget"]["attrs"]["data-strings"] = json.dumps(
+            {key: str(text) for key, text in self.get_strings().items()}
+        )
+        return context
+
     class Media:
         js = [
             forms.Script("vendored/luxon.min.js", defer=""),
