@@ -41,11 +41,12 @@ def active_schedule_pks(event):
 
 def room_is_in_use(room) -> bool:
     """True if the current or the WIP schedule contains a slot in ``room``."""
-    return room.talks.filter(schedule_id__in=active_schedule_pks(room.event)).exists()
+    slots = room.talks(manager="all_objects")
+    return slots.filter(schedule_id__in=active_schedule_pks(room.event)).exists()
 
 
 def annotate_room_usage(queryset, event):
-    slots = TalkSlot.objects.filter(room_id=OuterRef("pk"))
+    slots = TalkSlot.all_objects.filter(room_id=OuterRef("pk"))
     return queryset.annotate(
         has_slots=Exists(slots),
         has_scheduled_slots=Exists(

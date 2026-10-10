@@ -474,7 +474,8 @@ class TalkUpdate(PermissionRequired, View):
 
     def get_object(self):
         return (
-            self.request.event.wip_schedule.talks.with_display_data()
+            self.request.event.wip_schedule.talks(manager="all_objects")
+            .with_display_data()
             .with_sorted_speakers()
             .filter(pk=self.kwargs.get("pk"))
             .first()
@@ -535,7 +536,8 @@ class QuickScheduleView(PermissionRequired, UpdateView):
 
     def get_object(self):
         return (
-            self.request.event.wip_schedule.talks.select_related(
+            self.request.event.wip_schedule.talks(manager="all_objects")
+            .select_related(
                 "submission__event",
                 "submission__submission_type",
                 "schedule__event",

@@ -57,6 +57,11 @@ class TalkSlotQuerySet(models.QuerySet):
 
 
 class TalkSlotManager(models.Manager.from_queryset(TalkSlotQuerySet)):
+    def get_queryset(self):
+        return super().get_queryset().exclude(submission__is_hidden=True)
+
+
+class AllTalkSlotManager(models.Manager.from_queryset(TalkSlotQuerySet)):
     pass
 
 
@@ -116,6 +121,9 @@ class TalkSlot(PretalxModel):
     description = I18nCharField(null=True)
 
     objects = ScopedManager(event="schedule__event", _manager_class=TalkSlotManager)
+    all_objects = ScopedManager(
+        event="schedule__event", _manager_class=AllTalkSlotManager
+    )
 
     class Meta:
         ordering = ("start",)
@@ -222,7 +230,7 @@ class TalkSlot(PretalxModel):
         if not self.event.get_feature_flag("present_multiple_times"):
             return ""
         all_slots = list(
-            TalkSlot.objects.filter(
+            TalkSlot.all_objects.filter(
                 submission_id=self.submission_id, schedule_id=self.schedule_id
             ).order_by("start")
         )

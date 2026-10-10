@@ -63,9 +63,12 @@ def freeze_schedule(schedule, name, user=None, notify_speakers=True, comment=Non
         schedule.save(update_fields=["published", "version", "comment"])
         schedule.log_action("pretalx.schedule.release", person=user, orga=True)
 
+        # Hidden submissions' talk slots are not part of the default manager.
+        schedule_talks = schedule.talks(manager="all_objects")
+
         # Confirmed, public submissions and breaks are visible; blockers stay hidden.
-        schedule.talks.update(is_visible=False)
-        schedule.talks.filter(
+        schedule_talks.update(is_visible=False)
+        schedule_talks.filter(
             models.Q(
                 submission__state=SubmissionStates.CONFIRMED,
                 submission__is_hidden=False,
@@ -76,12 +79,12 @@ def freeze_schedule(schedule, name, user=None, notify_speakers=True, comment=Non
 
         talks = [
             copy_slot(talk, schedule=wip_schedule, save=False)
-            for talk in schedule.talks.select_related("submission", "room").all()
+            for talk in schedule_talks.select_related("submission", "room")
         ]
         TalkSlot.objects.bulk_create(talks)
 
         # Blockers should only exist in WIP, never in a released schedule.
-        schedule.talks.filter(slot_type=SlotType.BLOCKER).delete()
+        schedule_talks.filter(slot_type=SlotType.BLOCKER).delete()
 
         apply_signup_capacity_defaults(schedule, user=user)
 
@@ -174,13 +177,16 @@ def unfreeze_schedule(schedule, user=None):
     if not schedule.version:
         raise ValueError("Cannot unfreeze schedule version: not released yet.")
 
-    submission_ids = schedule.talks.values_list("submission_id", flat=True)
-    talks = schedule.event.wip_schedule.talks.exclude(submission_id__in=submission_ids)
+    schedule_talks = schedule.talks(manager="all_objects")
+    submission_ids = schedule_talks.values_list("submission_id", flat=True)
+    talks = schedule.event.wip_schedule.talks(manager="all_objects").exclude(
+        submission_id__in=submission_ids
+    )
     try:
         # Force evaluation to catch the DatabaseError early.
-        talks = list(talks.union(schedule.talks.all()))
+        talks = list(talks.union(schedule_talks.all()))
     except DatabaseError:  # pragma: no cover -- vendor-specific SQLite workaround
-        talks = set(talks) | set(schedule.talks.all())
+        talks = set(talks) | set(schedule_talks.all())
 
     with transaction.atomic():
         wip_schedule = schedule.event.schedules.create()
@@ -189,7 +195,7 @@ def unfreeze_schedule(schedule, user=None):
         ]
         TalkSlot.objects.bulk_create(new_talks)
 
-        schedule.event.wip_schedule.talks.all().delete()
+        schedule.event.wip_schedule.talks(manager="all_objects").all().delete()
         schedule.event.wip_schedule.delete()
 
     update_unreleased_schedule_changes(schedule.event, False)

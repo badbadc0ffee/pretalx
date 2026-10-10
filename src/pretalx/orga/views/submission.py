@@ -15,6 +15,7 @@ from django.db import transaction
 from django.db.models import (
     Count,
     OuterRef,
+    Prefetch,
     Q,
     Subquery,
     Value,
@@ -70,6 +71,7 @@ from pretalx.person.domain.profile import (
 )
 from pretalx.person.models import SpeakerProfile
 from pretalx.person.rules import is_only_reviewer
+from pretalx.schedule.models import TalkSlot
 from pretalx.submission.domain.cfp import cfp_deadlines
 from pretalx.submission.domain.invitation import retract_invitation
 from pretalx.submission.domain.queries.question import questions_for_user
@@ -127,7 +129,13 @@ class SubmissionViewMixin(PermissionRequired):
                 "event__cfp", "event__organiser", "track", "submission_type"
             )
             .with_sorted_speakers()
-            .prefetch_related("tags", "slots", "answers", "answers__question")
+            .prefetch_related(
+                "tags",
+                # The default manager would hide the slots of hidden sessions
+                Prefetch("slots", queryset=TalkSlot.all_objects.all()),
+                "answers",
+                "answers__question",
+            )
         )
 
     def _get_lightweight_submission_queryset(self):
@@ -363,8 +371,13 @@ class SubmissionDelete(SubmissionViewMixin, ActionConfirmMixin, TemplateView):
 
     @property
     def action_text(self):
-        current_slots = self.object.current_slots
-        has_scheduled_slots = current_slots is not None and current_slots.exists()
+        schedule = self.object.event.current_schedule
+        has_scheduled_slots = (
+            schedule is not None
+            and self.object.slots(manager="all_objects")
+            .filter(schedule=schedule, is_visible=True)
+            .exists()
+        )
         if has_scheduled_slots:
             return _(
                 "This session is part of the current schedule. All its schedule "
@@ -591,20 +604,6 @@ class SubmissionContent(
         if isinstance(self.object, Submission) and self.object.pk:
             prefetch_related_objects([self.object], "reviews")
         return ctx
-
-    @context
-    @cached_property
-    def has_unreleased_schedule_changes(self):
-        if not self.submission or not self.submission.event.current_schedule:
-            return False
-        fields = ("room_id", "start", "end", "is_visible")
-        wip_slots = self.submission.slots.filter(
-            schedule__version__isnull=True
-        ).values_list(*fields)
-        released_slots = self.submission.slots.filter(
-            schedule=self.submission.event.current_schedule
-        ).values_list(*fields)
-        return Counter(wip_slots) != Counter(released_slots)
 
     @context
     def size_warning(self):

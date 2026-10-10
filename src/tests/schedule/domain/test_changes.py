@@ -750,7 +750,7 @@ def test_get_cached_schedule_changes_uses_cache():
     schedule_v1 = ScheduleFactory(
         event=event, version="v1", published=now() - dt.timedelta(hours=2)
     )
-    TalkSlotFactory(
+    slot = TalkSlotFactory(
         schedule=schedule_v1,
         submission=submission,
         room=room,
@@ -761,10 +761,11 @@ def test_get_cached_schedule_changes_uses_cache():
     schedule_v2 = ScheduleFactory(event=event, version="v2")
 
     cache_key = f"schedule_{schedule_v2.id}_changes"
+    # Calculating the changes would find nothing, so this proves the cache is used.
     cached = {
-        "count": 42,
+        "count": 1,
         "action": "update",
-        "new_talks": [],
+        "new_talks": [{"id": slot.id, "submission_code": submission.code}],
         "canceled_talks": [],
         "moved_talks": [],
     }
@@ -772,7 +773,8 @@ def test_get_cached_schedule_changes_uses_cache():
 
     result = get_cached_schedule_changes(schedule_v2)
 
-    assert result["count"] == 42
+    assert result["count"] == 1
+    assert result["new_talks"] == [slot]
 
 
 def test_get_cached_schedule_changes_invalid_json_recalculates(event):

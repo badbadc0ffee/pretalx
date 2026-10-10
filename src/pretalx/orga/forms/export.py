@@ -489,17 +489,17 @@ class ScheduleExportForm(ExportForm):
         return [s.get_display_name() for s in obj.sorted_speakers]
 
     def _get_room_value(self, obj):
-        slot = obj.slot
+        slot = obj.orga_slot
         if slot and slot.room:
             return slot.room.name
 
     def _get_start(self, obj):
-        slot = obj.slot
+        slot = obj.orga_slot
         if slot and slot.start:
             return slot.local_start
 
     def _get_end(self, obj):
-        slot = obj.slot
+        slot = obj.orga_slot
         if slot and slot.real_end:
             return slot.local_end
 

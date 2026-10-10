@@ -607,7 +607,7 @@ class Event(PretalxModel):
             schedule = schedules[0]
             # It's only ever been two so far, but while we're being resilient …
             for dupe in schedules[1:]:
-                TalkSlot.objects.filter(schedule=dupe).delete()
+                TalkSlot.all_objects.filter(schedule=dupe).delete()
                 dupe.delete()
         return schedule
 

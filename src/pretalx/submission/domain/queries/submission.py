@@ -284,7 +284,7 @@ def annotate_submission_signup_status(queryset, current_schedule):
     queryset = annotate_confirmed_signup_count(queryset)
     if current_schedule is not None:
         room_capacity = (
-            TalkSlot.objects.filter(
+            TalkSlot.all_objects.filter(
                 submission=OuterRef("pk"), schedule=current_schedule
             )
             .order_by("pk")

@@ -14,7 +14,9 @@ def build_widget_data(
     include_blockers=False,
 ):
     talks = (
-        schedule.talks.all() if all_talks else schedule.talks.filter(is_visible=True)
+        schedule.talks(manager="all_objects").all()
+        if all_talks
+        else schedule.talks.filter(is_visible=True)
     )
     if not include_blockers:
         talks = talks.exclude(slot_type=SlotType.BLOCKER)

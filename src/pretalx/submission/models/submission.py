@@ -540,6 +540,19 @@ class Submission(GenerateCode, PretalxModel):
         )
 
     @cached_property
+    def orga_slot(self):
+        """Like ``slot``, but for organiser views: also finds the slot of a
+        hidden submission."""
+        if not self.event.current_schedule:
+            return None
+        return (
+            self.slots(manager="all_objects")
+            .filter(schedule=self.event.current_schedule)
+            .select_related("room", "submission", "submission__event")
+            .first()
+        )
+
+    @cached_property
     def current_slots(self):
         if not self.event.current_schedule:
             return None

@@ -20,6 +20,7 @@ from pretalx.mail.domain.template import mail_template_by_role
 from pretalx.mail.enums import MailTemplateRoles
 from pretalx.schedule.domain.changes import invalidate_unreleased_schedule_changes
 from pretalx.schedule.domain.slot import move_slot
+from pretalx.schedule.models import TalkSlot
 from pretalx.schedule.tasks import task_update_unreleased_schedule_changes
 from pretalx.submission.domain.access_code import redeem_access_code
 from pretalx.submission.domain.invitation import send_invitation
@@ -105,7 +106,7 @@ def create_submission(
 
 def delete_submission(submission, *, person=None, orga=True):
     with transaction.atomic():
-        submission.slots.all().delete()
+        TalkSlot.all_objects.filter(submission=submission).delete()
         submission.feedback.all().delete()
         # Delete answers and resources one-by-one so media files
         # get deleted too.
@@ -275,7 +276,7 @@ def update_talk_slots(submission):
     CONFIRMED state and the submission's public visibility setting.
     """
     wip = submission.event.wip_schedule
-    talks = wip.talks.filter(submission=submission)
+    talks = wip.talks(manager="all_objects").filter(submission=submission)
     scheduling_allowed = (
         submission.state in SubmissionStates.accepted_states
         or submission.pending_state in SubmissionStates.accepted_states
@@ -294,10 +295,10 @@ def update_talk_slots(submission):
                 "id", flat=True
             )
         )
-        wip.talks.filter(pk__in=to_delete).delete()
+        wip.talks(manager="all_objects").filter(pk__in=to_delete).delete()
     elif diff < 0:
         for __ in range(-diff):
-            wip.talks.create(submission=submission)
+            wip.talks(manager="all_objects").create(submission=submission)
     talks.update(
         is_visible=submission.state == SubmissionStates.CONFIRMED
         and not submission.is_hidden
@@ -308,7 +309,7 @@ def update_duration(submission):
     """Push the submission's duration onto its currently scheduled wip
     slots so the schedule reflects the new length."""
     duration = submission.get_duration()
-    for slot in submission.event.wip_schedule.talks.filter(
+    for slot in submission.event.wip_schedule.talks(manager="all_objects").filter(
         submission=submission, start__isnull=False
     ):
         move_slot(slot, slot.start, duration=duration)
@@ -366,12 +367,14 @@ def set_wip_slot(submission, *, room, start, end):
     slots are deleted and ``update_talk_slots`` recreates the bare ones.
     """
     if not (room and start and submission.state in SubmissionStates.accepted_states):
-        submission.slots.filter(schedule=submission.event.wip_schedule).delete()
+        TalkSlot.all_objects.filter(
+            submission=submission, schedule=submission.event.wip_schedule
+        ).delete()
         update_talk_slots(submission)
     else:
         slot = (
-            submission.slots.select_related("submission")
-            .filter(schedule=submission.event.wip_schedule)
+            TalkSlot.all_objects.select_related("submission")
+            .filter(submission=submission, schedule=submission.event.wip_schedule)
             .order_by("start")
             .first()
         )

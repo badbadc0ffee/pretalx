@@ -335,9 +335,9 @@ def _make_naive(moment):
 
 def _move_slots(event, delta, *, past=False):
     if past:
-        talk_queryset = TalkSlot.objects.filter(schedule__event=event)
+        talk_queryset = TalkSlot.all_objects.filter(schedule__event=event)
     else:
-        talk_queryset = event.wip_schedule.talks
+        talk_queryset = event.wip_schedule.talks(manager="all_objects")
     for key in ("start", "end"):
         filt = {f"{key}__isnull": False}
         update = {key: F(key) + delta}
@@ -351,7 +351,11 @@ def apply_date_edit(event, old_event):
     Only affects the WIP schedule. Drops slots at the tail end if the event
     gets shorter.
     """
-    if not event.wip_schedule.talks.filter(start__isnull=False).exists():
+    if (
+        not event.wip_schedule.talks(manager="all_objects")
+        .filter(start__isnull=False)
+        .exists()
+    ):
         return
     start_delta = event.date_from - old_event.date_from
     end_delta = event.date_to - old_event.date_to
@@ -369,7 +373,7 @@ def apply_date_edit(event, old_event):
     # I think it's more likely that people add a new day to the start.
     if shortened:
         # The event was shortened, de-schedule all talks outside the range
-        event.wip_schedule.talks.filter(
+        event.wip_schedule.talks(manager="all_objects").filter(
             Q(start__date__gt=event.date_to) | Q(start__date__lt=event.date_from)
         ).update(start=None, end=None, room=None)
         Availability.objects.filter(
@@ -396,7 +400,11 @@ def apply_timezone_edit(event, old_event):
     """React to an organiser changing the event's timezone, preserving the
     apparent local time of every scheduled session. Includes historical data.
     """
-    first_slot = event.wip_schedule.talks.filter(start__isnull=False).first()
+    first_slot = (
+        event.wip_schedule.talks(manager="all_objects")
+        .filter(start__isnull=False)
+        .first()
+    )
     if not first_slot:
         return
 
@@ -475,7 +483,7 @@ def shred_event(event, person=None):
             (event.queued_mails.all(), False),
             (event.cfp, False),
             (event.information.all(), True),
-            (TalkSlot.objects.filter(schedule__event=event), False),
+            (TalkSlot.all_objects.filter(schedule__event=event), False),
             (Feedback.objects.filter(talk__event=event), False),
             (
                 Resource.objects.filter(submission__event=event).select_related(

@@ -84,7 +84,9 @@ def _deserialize_changes(serialized: dict, event) -> dict:
     if submission_codes:
         submissions_by_code = {
             sub.code: sub
-            for sub in Submission.objects.filter(code__in=submission_codes, event=event)
+            for sub in Submission.objects.filter(
+                code__in=submission_codes, event=event, is_hidden=False
+            )
             .select_related("event")
             .with_sorted_speakers()
         }
@@ -160,6 +162,12 @@ def _deserialize_changes(serialized: dict, event) -> dict:
                 }
             )
 
+    # Entries may have been dropped since the changes were cached, e.g. hidden ones.
+    changes["count"] = (
+        len(changes["new_talks"])
+        + len(changes["canceled_talks"])
+        + len(changes["moved_talks"])
+    )
     return changes
 
 

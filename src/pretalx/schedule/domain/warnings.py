@@ -62,7 +62,7 @@ def get_talk_warnings(
         overlaps = talk.pk in room_overlap_ids
     else:
         overlaps = (
-            TalkSlot.objects.filter(
+            TalkSlot.all_objects.filter(
                 schedule=schedule,
                 room=talk.room,
                 start__lt=talk.real_end,
@@ -106,7 +106,7 @@ def get_talk_warnings(
             overlaps = speaker.pk in speaker_overlaps_by_talk.get(talk.pk, ())
         else:
             overlaps = (
-                TalkSlot.objects.filter(
+                TalkSlot.all_objects.filter(
                     schedule=schedule,
                     submission__speakers=speaker,
                     start__lt=talk.real_end,
@@ -171,9 +171,8 @@ def _signup_capacity_warnings(talk):
 def get_all_talk_warnings(schedule, ids=None, filter_updated=None):
     show_signup_warnings = schedule.event.get_feature_flag("attendee_signup")
     talks = (
-        schedule.talks.filter(
-            submission__isnull=False, start__isnull=False, room__isnull=False
-        )
+        schedule.talks(manager="all_objects")
+        .filter(submission__isnull=False, start__isnull=False, room__isnull=False)
         .select_related(
             "submission",
             "submission__submission_type",
@@ -207,7 +206,8 @@ def get_all_talk_warnings(schedule, ids=None, filter_updated=None):
         # (no submission, excluded from ``talks``) for the full scan, every
         # other scheduled slot for subset mode.
         extra_slots_qs = (
-            schedule.talks.filter(start__isnull=False, room__isnull=False)
+            schedule.talks(manager="all_objects")
+            .filter(start__isnull=False, room__isnull=False)
             .select_related("submission", "submission__submission_type")
             .with_sorted_speakers()
         )
@@ -314,7 +314,7 @@ def compute_warnings(schedule) -> dict:
     visible due to their unconfirmed status, and ``no_track`` are
     submissions without a track in a conference that uses tracks.
     """
-    talks = schedule.talks.filter(submission__isnull=False)
+    talks = schedule.talks(manager="all_objects").filter(submission__isnull=False)
     talk_warnings = [
         {"talk": key, "warnings": value}
         for key, value in get_all_talk_warnings(schedule).items()
@@ -340,7 +340,7 @@ def compute_warnings(schedule) -> dict:
 
 
 def overbooked_slots_for_room(room):
-    slots = room.event.wip_schedule.talks
+    slots = room.event.wip_schedule.talks(manager="all_objects")
     if room.capacity is None:
         return slots.none()
     return annotate_slot_confirmed_signup_count(
@@ -355,18 +355,22 @@ def compute_signup_warnings(schedule) -> dict:
         "signup_overfull": [],
         "signup_dropped_with_attendees": [],
     }
-    no_capacity_slots = schedule.talks.filter(
-        submission__isnull=False,
-        submission__attendee_signup_capacity__isnull=True,
-        room__isnull=False,
-        room__capacity__isnull=True,
-        start__isnull=False,
-    ).select_related(
-        "submission",
-        "submission__event",
-        "submission__submission_type",
-        "submission__track",
-        "room",
+    no_capacity_slots = (
+        schedule.talks(manager="all_objects")
+        .filter(
+            submission__isnull=False,
+            submission__attendee_signup_capacity__isnull=True,
+            room__isnull=False,
+            room__capacity__isnull=True,
+            start__isnull=False,
+        )
+        .select_related(
+            "submission",
+            "submission__event",
+            "submission__submission_type",
+            "submission__track",
+            "room",
+        )
     )
     no_capacity_slots = annotate_slot_requires_signup(no_capacity_slots).filter(
         _annotated_requires_signup=True
@@ -375,17 +379,21 @@ def compute_signup_warnings(schedule) -> dict:
         result["signup_no_capacity"].append(
             {"submission": slot.submission, "slot": slot}
         )
-    scheduled_slots = schedule.talks.filter(
-        submission__isnull=False,
-        room__isnull=False,
-        start__isnull=False,
-        room__capacity__isnull=False,
-    ).select_related(
-        "submission",
-        "submission__event",
-        "submission__submission_type",
-        "submission__track",
-        "room",
+    scheduled_slots = (
+        schedule.talks(manager="all_objects")
+        .filter(
+            submission__isnull=False,
+            room__isnull=False,
+            start__isnull=False,
+            room__capacity__isnull=False,
+        )
+        .select_related(
+            "submission",
+            "submission__event",
+            "submission__submission_type",
+            "submission__track",
+            "room",
+        )
     )
     scheduled_slots = annotate_slot_confirmed_signup_count(
         annotate_slot_requires_signup(scheduled_slots)
@@ -424,12 +432,14 @@ def compute_signup_warnings(schedule) -> dict:
             previous.scheduled_talks.values_list("submission_id", flat=True)
         )
         current_submission_ids = set(
-            schedule.talks.filter(
+            schedule.talks(manager="all_objects")
+            .filter(
                 submission__isnull=False,
                 submission__state=SubmissionStates.CONFIRMED,
                 room__isnull=False,
                 start__isnull=False,
-            ).values_list("submission_id", flat=True)
+            )
+            .values_list("submission_id", flat=True)
         )
         dropped_ids = previous_submission_ids - current_submission_ids
         if dropped_ids:

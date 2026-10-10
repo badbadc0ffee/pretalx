@@ -34,7 +34,8 @@ def merged_speaker_availabilities(schedule):
 
     result = {}
     talks = (
-        schedule.talks.filter(submission__isnull=False)
+        schedule.talks(manager="all_objects")
+        .filter(submission__isnull=False)
         .select_related("submission")
         .with_sorted_speakers()
     )

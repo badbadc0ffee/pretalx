@@ -128,7 +128,7 @@ class Room(OrderedModel, PretalxModel):
     def is_deletable(self) -> bool:
         if (has_slots := getattr(self, "has_slots", None)) is not None:
             return not has_slots
-        return not self.talks.exists()
+        return not self.talks(manager="all_objects").exists()
 
     @property
     def is_in_use(self) -> bool:

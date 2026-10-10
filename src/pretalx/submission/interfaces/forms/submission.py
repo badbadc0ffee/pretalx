@@ -317,7 +317,8 @@ class SubmissionOrgaForm(ReadOnlyFlag, RequestRequire, forms.ModelForm):
         instance = kwargs.get("instance")
         if instance and not instance._state.adding:
             slot = (
-                instance.slots.filter(schedule__version__isnull=True)
+                instance.slots(manager="all_objects")
+                .filter(schedule__version__isnull=True)
                 .select_related("room")
                 .filter(start__isnull=False)
                 .order_by("start")
